@@ -1,0 +1,80 @@
+model:
+  model_args:
+    device_map: auto
+    pretrained_model_name_or_path: locuslab/tofu_ft_llama2-7b
+    attn_implementation: flash_attention_2
+    torch_dtype: bfloat16
+  tokenizer_args:
+    pretrained_model_name_or_path: locuslab/tofu_ft_llama2-7b
+  template_args:
+    apply_chat_template: false
+    user_start_tag: '[INST] '
+    user_end_tag: ' [/INST]'
+    asst_start_tag: ''
+    asst_end_tag: ''
+mode: eval
+task_name: eval
+eval:
+  tofu:
+    metrics:
+      forget_Q_A_Prob:
+        datasets:
+          TOFU_QA_forget:
+            handler: QADataset
+            args:
+              hf_args:
+                name: ${eval.tofu.forget_split}
+                split: train
+                path: locuslab/TOFU
+              question_key: question
+              answer_key: answer
+              max_length: 512
+        collators:
+          DataCollatorForSupervisedDataset:
+            handler: DataCollatorForSupervisedDataset
+            args:
+              padding_side: right
+              index: index
+        handler: probability
+        batch_size: 32
+      forget_Q_A_ROUGE:
+        datasets:
+          TOFU_QA_forget:
+            handler: QADataset
+            args:
+              hf_args:
+                name: ${eval.tofu.forget_split}
+                split: train
+                path: locuslab/TOFU
+              question_key: question
+              answer_key: answer
+              max_length: 512
+              predict_with_generate: true
+        collators:
+          DataCollatorForSupervisedDataset:
+            handler: DataCollatorForSupervisedDataset
+            args:
+              padding_side: left
+              index: index
+        generation_args:
+          do_sample: false
+          top_p: null
+          temperature: null
+          max_new_tokens: 200
+          use_cache: true
+        handler: rouge
+        rouge_type: rougeL_recall
+        batch_size: 32
+    handler: TOFUEvaluator
+    output_dir: ${paths.output_dir}
+    overwrite: false
+    forget_split: ${forget_split}
+    retain_logs_path: ${retain_logs_path}
+paths:
+  root_dir: .
+  data_dir: ${paths.root_dir}/data/
+  datasets: ${paths.root_dir}/configs/data/datasets
+  output_dir: ${paths.root_dir}/saves/${mode}/${task_name}
+  work_dir: ${hydra:runtime.cwd}
+forget_split: forget10
+retain_logs_path: null

@@ -1,0 +1,193 @@
+model:
+  model_args:
+    pretrained_model_name_or_path: muse-bench/MUSE-${data_split}_target
+    attn_implementation: flash_attention_2
+    torch_dtype: bfloat16
+  tokenizer_args:
+    pretrained_model_name_or_path: meta-llama/Llama-2-7b-hf
+  template_args:
+    apply_chat_template: false
+    user_start_tag: 'Question: '
+    user_end_tag: '
+
+      '
+    asst_start_tag: 'Answer: '
+    asst_end_tag: '
+
+
+      '
+trainer:
+  handler: NPO
+  args:
+    per_device_train_batch_size: 4
+    per_device_eval_batch_size: 16
+    gradient_accumulation_steps: 8
+    learning_rate: 1.0e-05
+    bf16: true
+    bf16_full_eval: true
+    logging_steps: 5
+    output_dir: ${paths.output_dir}
+    logging_dir: ${trainer.args.output_dir}/logs
+    report_to: tensorboard
+    optim: paged_adamw_32bit
+    save_strategy: 'no'
+    save_only_model: true
+    weight_decay: 0.0
+    do_train: true
+    do_eval: true
+    eval_on_start: true
+    eval_strategy: epoch
+    num_train_epochs: 10
+    seed: 0
+    lr_scheduler_type: constant
+    remove_unused_columns: false
+  method_args:
+    gamma: 1.0
+    alpha: 1.0
+    retain_loss_type: NLL
+    beta: 0.1
+data:
+  forget:
+    MUSE_forget:
+      handler: PretrainingDataset
+      args:
+        hf_args:
+          path: muse-bench/MUSE-News
+          name: train
+          split: ${forget_split}
+        text_key: text
+        max_length: 128
+        insert_space: true
+  retain:
+    MUSE_retain:
+      handler: PretrainingDataset
+      args:
+        hf_args:
+          path: muse-bench/MUSE-News
+          name: train
+          split: ${retain_split}
+        text_key: text
+        max_length: 128
+        insert_space: true
+  anchor: forget
+collator:
+  DataCollatorForSupervisedDataset:
+    handler: DataCollatorForSupervisedDataset
+    args:
+      padding_side: right
+eval:
+  muse:
+    metrics:
+      forget_knowmem_ROUGE:
+        datasets:
+          MUSE_forget_knowmem:
+            handler: QADataset
+            args:
+              hf_args:
+                path: muse-bench/MUSE-${eval.muse.data_split}
+                name: knowmem
+                split: forget_qa
+              few_shot_dataset_hf_args:
+                path: muse-bench/MUSE-${eval.muse.data_split}
+                name: knowmem
+                split: forget_qa_icl
+              question_key: question
+              answer_key: answer
+              max_length: 512
+              predict_with_generate: true
+        collators:
+          DataCollatorForSupervisedDataset:
+            handler: DataCollatorForSupervisedDataset
+            args:
+              padding_side: left
+              index: index
+        generation_args:
+          do_sample: false
+          top_p: null
+          temperature: null
+          max_new_tokens: 32
+          use_cache: true
+          stopwords:
+          - '
+
+
+            '
+          - '
+
+            Question'
+          - 'Question:'
+        handler: rouge
+        rouge_type: rougeL_f1
+        batch_size: 16
+      privleak:
+        pre_compute:
+          forget_minKpc_neg_logprob:
+            datasets:
+              MUSE_forget_privleak:
+                handler: PretrainingDataset
+                args:
+                  hf_args:
+                    path: muse-bench/MUSE-${eval.muse.data_split}
+                    name: privleak
+                    split: forget
+                  prefix_key: prompt
+                  text_key: text
+            collators:
+              DataCollatorForSupervisedDataset:
+                handler: DataCollatorForSupervisedDataset
+                args:
+                  padding_side: right
+                  index: index
+            handler: minKpc_negative_logprob
+            batch_size: 8
+            k: 0.4
+            access_key: forget
+          holdout_minKpc_neg_logprob:
+            datasets:
+              MUSE_holdout_privleak:
+                handler: PretrainingDataset
+                args:
+                  hf_args:
+                    path: muse-bench/MUSE-${eval.muse.data_split}
+                    name: privleak
+                    split: holdout
+                  prefix_key: prompt
+                  text_key: text
+            collators:
+              DataCollatorForSupervisedDataset:
+                handler: DataCollatorForSupervisedDataset
+                args:
+                  padding_side: right
+                  index: index
+            handler: minKpc_negative_logprob
+            batch_size: 8
+            k: 0.4
+            access_key: holdout
+        reference_logs:
+          retain_model_logs:
+            path: ${eval.muse.retain_logs_path}
+            include:
+              forget_minKpc_neg_logprob:
+                access_key: retain
+              holdout_minKpc_neg_logprob:
+                access_key: holdout
+        handler: privleak
+        ref_value: 0.5
+    handler: MUSEEvaluator
+    device: cuda
+    output_dir: ${paths.output_dir}
+    overwrite: false
+    data_split: ${data_split}
+    retain_logs_path: ${retain_logs_path}
+paths:
+  root_dir: .
+  data_dir: ${paths.root_dir}/data/
+  datasets: ${paths.root_dir}/configs/data/datasets
+  output_dir: ${paths.root_dir}/saves/${mode}/${task_name}
+  work_dir: ${hydra:runtime.cwd}
+data_split: News
+forget_split: forget
+retain_split: retain1
+retain_logs_path: saves/eval/muse_news_retain/MUSE_EVAL.json
+task_name: llama2_news_NPO
+mode: unlearn

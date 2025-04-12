@@ -1,0 +1,17 @@
+defaults:
+  - model: Llama-3.2-3B-Instruct
+  - trainer: GradAscent
+  - data: unlearn
+  - collator: DataCollatorForSupervisedDataset
+  - eval: tofu
+  - hydra: default
+  - paths: default
+  - experiment: null
+  - _self_
+
+trainer:
+  args: 
+    remove_unused_columns: False
+
+mode: unlearn
+task_name: ???

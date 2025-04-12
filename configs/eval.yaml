@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - _self_
+  - model: Llama-3.2-3B-Instruct
+  - eval: tofu
+  - paths: default
+  - hydra: eval
+  - experiment: null
+
+model:
+  model_args:
+    device_map: cuda
+
+mode: eval
+task_name: ???
+seed: 0

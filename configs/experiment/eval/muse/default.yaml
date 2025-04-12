@@ -1,0 +1,19 @@
+# @package _global_
+
+defaults:
+  - override /model: Llama-2-7b-hf
+  - override /eval: muse
+
+data_split: News
+retain_logs_path: null
+
+model:
+  model_args:
+    pretrained_model_name_or_path: muse-bench/MUSE-${data_split}_target
+
+eval:
+  muse:
+    data_split: ${data_split}
+    retain_logs_path: ${retain_logs_path}
+  
+task_name: ???
