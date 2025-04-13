@@ -1,0 +1,51 @@
+handler: FederatedUnlearningTrainer
+method_args:
+  num_clients: 3
+  target_client_idx: 0
+  unlearn_trainer_cls: "GradAscent"  # 可以是GradAscent, GradDiff, NPO, DPO, SimNPO, RMU
+  aggregation_strategy: "average"
+
+args:
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 16
+  gradient_accumulation_steps: 4
+  learning_rate: 1e-5
+  bf16: True
+  bf16_full_eval: True
+  logging_steps: 5
+  output_dir: ${paths.output_dir}
+  logging_dir: ${trainer.args.output_dir}/logs
+  report_to: tensorboard
+  ddp_find_unused_parameters: None
+  gradient_checkpointing: False
+  optim: paged_adamw_32bit
+  save_strategy: 'no'
+  save_only_model: True
+  weight_decay: 0.00
+  do_train: True
+  do_eval: True
+  eval_on_start: True
+  eval_strategy: epoch
+  num_train_epochs: 10
+  seed: 0
+  # output_dir: "/home/ecs-user/FedLLMUnlearning/model"
+  # learning_rate: 0.01
+  # per_device_train_batch_size: 1
+  # per_device_eval_batch_size: 1
+  # gradient_accumulation_steps: 2
+  # warmup_epochs: 0.1
+  # num_train_epochs: 1.0
+  # weight_decay: 0
+  # fp16: False
+  # logging_steps: 10
+  # evaluation_strategy: "no"
+  # save_strategy: 'no'
+  # # save_steps: 0.5
+  # # save_total_limit: 3
+  # seed: 42
+  # dataloader_num_workers: 0
+  # dataloader_pin_memory: true
+  # group_by_length: true
+  # do_train: true
+  # do_eval: false
+
