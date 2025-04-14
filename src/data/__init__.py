@@ -51,57 +51,57 @@ def get_datasets(dataset_cfgs: Union[Dict, DictConfig], **kwargs):
 
 
 # train从这里获得data
-def get_data(data_cfg: DictConfig, mode="train", **kwargs):
-    data = {}
-    data_cfg = dict(data_cfg)
-    anchor = data_cfg.pop("anchor", "forget")
-    for split, dataset_cfgs in data_cfg.items():
-        data[split] = get_datasets(dataset_cfgs, **kwargs)
-    if mode == "train":
-        return data
-    elif mode == "unlearn":
-        unlearn_splits = {k: v for k, v in data.items() if k not in ("eval", "test")}
-
-
-        # 对forget部分data进行unlearn train
-        unlearn_dataset = ForgetRetainDataset(**unlearn_splits, anchor=anchor)
-
-        
-
-        data["train"] = unlearn_dataset
-        for split in unlearn_splits:
-            data.pop(split)
-    return data
-
 # def get_data(data_cfg: DictConfig, mode="train", **kwargs):
 #     data = {}
 #     data_cfg = dict(data_cfg)
 #     anchor = data_cfg.pop("anchor", "forget")
 #     for split, dataset_cfgs in data_cfg.items():
 #         data[split] = get_datasets(dataset_cfgs, **kwargs)
-    
 #     if mode == "train":
 #         return data
 #     elif mode == "unlearn":
 #         unlearn_splits = {k: v for k, v in data.items() if k not in ("eval", "test")}
 
-#         # Create unlearn and retain datasets
+
+#         # 对forget部分data进行unlearn train
 #         unlearn_dataset = ForgetRetainDataset(**unlearn_splits, anchor=anchor)
-#         retain_dataset = ForgetRetainDataset(**unlearn_splits, anchor="retain")
-#         print(f"Unlearn dataset data structure: {unlearn_dataset}")
-#         print(f"Retain dataset data structure: {retain_dataset}")
 
-#         # Assign datasets to data
-#         data["forget"] = unlearn_dataset
-#         data["retain"] = retain_dataset
         
-#         # Remove only the original splits, preserving "forget" and "retain"
-#         for split in list(unlearn_splits.keys()):
-#             if split not in ("forget", "retain"):  # Protect "forget" and "retain"
-#                 data.pop(split, None)  # Use None to avoid KeyError if key doesn't exist
 
-#         print(f"11111 data structure: {data.keys()}")
+#         data["train"] = unlearn_dataset
+#         for split in unlearn_splits:
+#             data.pop(split)
 #     return data
+
+def get_data(data_cfg: DictConfig, mode="train", **kwargs):
+    data = {}
+    data_cfg = dict(data_cfg)
+    anchor = data_cfg.pop("anchor", "forget")
+    for split, dataset_cfgs in data_cfg.items():
+        data[split] = get_datasets(dataset_cfgs, **kwargs)
+    
+    if mode == "train":
+        return data
+    elif mode == "unlearn":
+        unlearn_splits = {k: v for k, v in data.items() if k not in ("eval", "test")}
+
+        # Create unlearn and retain datasets
+        unlearn_dataset = ForgetRetainDataset(**unlearn_splits, anchor=anchor)
+        retain_dataset = ForgetRetainDataset(**unlearn_splits, anchor="retain")
+        print(f"Unlearn dataset data structure: {unlearn_dataset}")
+        print(f"Retain dataset data structure: {retain_dataset}")
+
+        # Assign datasets to data
+        data["forget"] = unlearn_dataset
+        data["retain"] = retain_dataset
+        
+        # Remove only the original splits, preserving "forget" and "retain"
+        for split in list(unlearn_splits.keys()):
+            if split not in ("forget", "retain"):  # Protect "forget" and "retain"
+                data.pop(split, None)  # Use None to avoid KeyError if key doesn't exist
+
+        print(f"11111 data structure: {data.keys()}")
+    return data
 
 
 def _get_single_collator(collator_name: str, collator_cfg: DictConfig, **kwargs):
