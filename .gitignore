@@ -9,6 +9,7 @@ ms_cache/
 logs/
 hf_cache/
 cache*/
+saves/
 saves*/
 notebooks/
 output*/
@@ -16,7 +17,8 @@ wandb/
 data/
 !*/data/ 
 evals/
-!*/evals/  
+!*/evals/ 
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

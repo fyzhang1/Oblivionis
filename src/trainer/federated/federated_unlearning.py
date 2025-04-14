@@ -45,6 +45,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             template_args=template_args,
         )
         
+        # logger.info(f"Training args: {self.args}")
         self.num_clients = num_clients
         self.target_client_idx = target_client_idx
         self.unlearn_trainer_cls = unlearn_trainer_cls or "GradAscent"
@@ -69,6 +70,15 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         logger.info("Starting federated unlearning training")
         self.client_models = [deepcopy(self.model) for _ in range(self.num_clients)]
         
+
+        # 验证复制的模型
+        # for idx, client_model in enumerate(self.client_models):
+        #     for key, param in client_model.state_dict().items():
+        #         if param.numel() == 0:
+        #             logger.error(f"Client {idx} model has empty parameter after deepcopy: {key}")
+        #         else:
+        #             logger.info(f"Client {idx} parameter {key} size: {param.size()}")
+
         # 训练客户端模型
         for client_idx in range(self.num_clients):
             if client_idx not in self.federated_dataset:
@@ -118,6 +128,8 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
 
     def _unlearn_client_model(self, client_model, client_dataset):
         """对目标客户端执行遗忘训练，只使用 forget 数据"""
+
+        # logger.info(f"Passing args to Unlearning: {self.args}")
         from trainer import TRAINER_REGISTRY
         trainer_cls = TRAINER_REGISTRY.get(self.unlearn_trainer_cls, None)
         if trainer_cls is None:
@@ -156,17 +168,35 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         )
         
         unlearn_trainer.train()
+
+        for key, param in client_model.state_dict().items():
+            if param.numel() == 0:
+                logger.warning(f"Client model has empty parameter after unlearning: {key}")
+            else:
+                logger.info(f"Unlearn client parameter {key} size: {param.size()}")
         return unlearn_trainer
-    
+
+
     def _train_client_model(self, client_model, client_dataset):
-        """对客户端执行正常训练，使用 retain 数据"""
         retain_data = client_dataset.get("retain")
         if retain_data is None:
             raise ValueError(f"Client has no retain data!")
         
+        # 提取 'retain' 子字典
+        logger.info(f"retain_data type: {type(retain_data)}")
+        logger.info(f"retain_data length: {len(retain_data)}")
+        sample = retain_data[0]
+        logger.info(f"Sample type: {type(sample)}")
+        logger.info(f"Sample content: {sample}")
+        
+        # 转换为干净的样本列表
+        filtered_retain_data = [sample['retain'] for sample in retain_data]
+
+        logger.info(f"Filtered retain_data sample: {filtered_retain_data[0]}")
+        
         trainer = FinetuneTrainer(
             model=client_model,
-            train_dataset=retain_data,
+            train_dataset=filtered_retain_data,
             tokenizer=self.tokenizer,
             data_collator=self.data_collator,
             args=self.args,
@@ -174,10 +204,57 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             template_args=self.template_args,
         )
         trainer.train()
+        # for key, param in client_model.state_dict().items():
+        #     if param.numel() == 0:
+        #         logger.warning(f"Client model has empty parameter after training: {key}")
         return trainer
     
+    # def _train_client_model(self, client_model, client_dataset):
+    #     """对客户端执行正常训练，使用 retain 数据"""
+    #     retain_data = client_dataset.get("retain")
+    #     if retain_data is None:
+    #         raise ValueError(f"Client has no retain data!")
+
+    #     # 调试 retain_data
+    #     logger.info(f"retain_data type: {type(retain_data)}")
+    #     logger.info(f"retain_data length: {len(retain_data)}")
+    #     sample = retain_data[0]
+    #     logger.info(f"Sample type: {type(sample)}")
+    #     logger.info(f"Sample content: {sample}")
+        
+    #     trainer = FinetuneTrainer(
+    #         model=client_model,
+    #         train_dataset=retain_data,
+    #         tokenizer=self.tokenizer,
+    #         data_collator=self.data_collator,
+    #         args=self.args,
+    #         evaluator=self.evaluator,
+    #         template_args=self.template_args,
+    #     )
+    #     trainer.train()
+    #     return trainer
+    
+    # def _aggregate_models(self):
+    #     """聚合所有客户端模型，更新全局模型"""
+    #     logger.info("Aggregating client models")
+    #     client_state_dicts = [model.state_dict() for model in self.client_models]
+        
+    #     if self.aggregation_strategy == "average":
+    #         global_state_dict = {}
+    #         for key in client_state_dicts[0].keys():
+    #             if isinstance(client_state_dicts[0][key], torch.Tensor):
+    #                 global_state_dict[key] = torch.stack([
+    #                     state_dict[key] for state_dict in client_state_dicts
+    #                 ]).mean(dim=0)
+    #             else:
+    #                 global_state_dict[key] = client_state_dicts[0][key]
+    #     else:
+    #         raise NotImplementedError(f"Strategy {self.aggregation_strategy} not implemented")
+        
+    #     self.model.load_state_dict(global_state_dict)
+    #     logger.info("Global model updated")
+
     def _aggregate_models(self):
-        """聚合所有客户端模型，更新全局模型"""
         logger.info("Aggregating client models")
         client_state_dicts = [model.state_dict() for model in self.client_models]
         
@@ -185,9 +262,12 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             global_state_dict = {}
             for key in client_state_dicts[0].keys():
                 if isinstance(client_state_dicts[0][key], torch.Tensor):
-                    global_state_dict[key] = torch.stack([
-                        state_dict[key] for state_dict in client_state_dicts
-                    ]).mean(dim=0)
+                    valid_params = [state_dict[key] for state_dict in client_state_dicts if state_dict[key].numel() > 0]
+                    if valid_params:
+                        global_state_dict[key] = torch.stack(valid_params).mean(dim=0)
+                    else:
+                        global_state_dict[key] = self.model.state_dict()[key]
+                        logger.warning(f"All clients have empty parameter for {key}, using global model parameter")
                 else:
                     global_state_dict[key] = client_state_dicts[0][key]
         else:

@@ -81,6 +81,7 @@ def main(cfg: DictConfig):
             tokenizer=tokenizer,
         )
 
+    evaluator = None
     trainer, trainer_args = load_trainer(
         trainer_cfg=trainer_cfg,
         model=model,

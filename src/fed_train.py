@@ -8,6 +8,15 @@ from trainer.utils import seed_everything
 
 
 # python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default trainer=FederatedUnlearningTrainer task_name=test
+
+"""
+CUDA_VISIBLE_DEVICES=0,1 accelerate launch \
+  --config_file configs/accelerate/default_config.yaml --main_process_port 18765 \
+  src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test
+
+
+python src/eval.py  experiment=eval/tofu/default.yaml task_name=SAMPLE_UNLEARN
+"""
 @hydra.main(version_base=None, config_path="../configs", config_name="train.yaml")
 def main(cfg: DictConfig):
     seed_everything(cfg.trainer.args.seed)
@@ -19,6 +28,9 @@ def main(cfg: DictConfig):
 
     data_cfg = cfg.data
     data = get_data(data_cfg, mode=mode, tokenizer=tokenizer, template_args=template_args)
+    print("-------------------------------------------------init data----------------------------------")
+    print(data)
+    # print(f"forget_data type: {type(data.get("forget"))}")
     is_federated = cfg.trainer.handler == "FederatedUnlearningTrainer"
     
     if is_federated and mode == "unlearn":
@@ -53,7 +65,7 @@ def main(cfg: DictConfig):
         )
 
     
-
+    evaluator = None
     trainer, trainer_args = load_trainer(
         trainer_cfg=trainer_cfg,
         model=model,
