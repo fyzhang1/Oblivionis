@@ -5,6 +5,7 @@ from trainer.utils import seed_everything
 from model import get_model
 from evals import get_evaluators
 
+# python src/eval.py  experiment=eval/tofu/default.yaml task_name=test
 
 @hydra.main(version_base=None, config_path="../configs", config_name="eval.yaml")
 def main(cfg: DictConfig):

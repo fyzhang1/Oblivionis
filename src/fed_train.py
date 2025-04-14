@@ -7,7 +7,7 @@ from evals import get_evaluator
 from trainer.utils import seed_everything
 
 
-# python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default trainer=FederatedUnlearningTrainer task_name=test
+# python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test
 
 """
 CUDA_VISIBLE_DEVICES=0,1 accelerate launch \
@@ -15,7 +15,19 @@ CUDA_VISIBLE_DEVICES=0,1 accelerate launch \
   src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test
 
 
-python src/eval.py  experiment=eval/tofu/default.yaml task_name=SAMPLE_UNLEARN
+# python src/eval.py  experiment=eval/tofu/default.yaml task_name=test
+
+  
+
+            CUDA_VISIBLE_DEVICES=0 python src/eval.py \
+            experiment=eval/tofu/default.yaml \
+            forget_split=forget10 \
+            holdout_split=retain90 \
+            task_name=test \
+            model.model_args.pretrained_model_name_or_path=saves/unlearn/test \
+            paths.output_dir=saves/unlearn/test/evals \
+            retain_logs_path=saves/eval/test/TOFU_EVAL.json
+
 """
 @hydra.main(version_base=None, config_path="../configs", config_name="train.yaml")
 def main(cfg: DictConfig):
