@@ -44,3 +44,68 @@ class ForgetRetainDataset(Dataset):
                 forget_idx = torch.randint(0, len(self.forget), (1,)).item()
                 item["forget"] = self.forget[forget_idx]
         return item
+
+def get_federated_data(forget_dataset, retain_dataset, num_clients, target_client_idx):
+    """
+    Split the datasets among clients in a federated learning setup.
+    
+    Args:
+        forget_dataset (Dataset): Dataset containing samples to be forgotten
+        retain_dataset (Dataset): Dataset containing samples to be retained
+        num_clients (int): Number of clients in federated learning
+        target_client_idx (int): Index of the client that will receive forget data
+        
+    Returns:
+        dict: Dictionary mapping client indices to their datasets
+    """
+    if target_client_idx >= num_clients:
+        raise ValueError(f"Target client index {target_client_idx} must be less than number of clients {num_clients}")
+    
+    # Create an empty dictionary to store client datasets
+    client_datasets = {}
+    
+    # The target client receives the forget dataset (for unlearning)
+    # and a portion of the retain dataset
+    if forget_dataset is not None:
+        client_datasets[target_client_idx] = {
+            "forget": forget_dataset,
+            "retain": None  # Will be filled with a portion of retain_dataset
+        }
+    else:
+        client_datasets[target_client_idx] = {
+            "forget": None,
+            "retain": None  # Will be filled with a portion of retain_dataset
+        }
+    
+    # Split retain dataset among all clients
+    if retain_dataset is not None:
+        dataset_size = len(retain_dataset)
+        indices = torch.randperm(dataset_size).tolist()
+        
+        # Calculate the size of each client's portion
+        client_size = dataset_size // num_clients
+        
+        for client_idx in range(num_clients):
+            # Calculate start and end indices for this client's data
+            start_idx = client_idx * client_size
+            # For the last client, include any remaining samples
+            end_idx = start_idx + client_size if client_idx < num_clients - 1 else dataset_size
+            
+            # Get indices for this client
+            client_indices = indices[start_idx:end_idx]
+            
+            # Create subset of retain_dataset for this client
+            from torch.utils.data import Subset
+            client_retain = Subset(retain_dataset, client_indices)
+            
+            if client_idx == target_client_idx:
+                # Add retain data to target client
+                client_datasets[client_idx]["retain"] = client_retain
+            else:
+                # For non-target clients, they only have retain data
+                client_datasets[client_idx] = {
+                    "forget": None,
+                    "retain": client_retain
+                }
+    
+    return client_datasets

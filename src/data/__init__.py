@@ -50,29 +50,6 @@ def get_datasets(dataset_cfgs: Union[Dict, DictConfig], **kwargs):
     return dataset
 
 
-# train从这里获得data
-# def get_data(data_cfg: DictConfig, mode="train", **kwargs):
-#     data = {}
-#     data_cfg = dict(data_cfg)
-#     anchor = data_cfg.pop("anchor", "forget")
-#     for split, dataset_cfgs in data_cfg.items():
-#         data[split] = get_datasets(dataset_cfgs, **kwargs)
-#     if mode == "train":
-#         return data
-#     elif mode == "unlearn":
-#         unlearn_splits = {k: v for k, v in data.items() if k not in ("eval", "test")}
-
-
-#         # 对forget部分data进行unlearn train
-#         unlearn_dataset = ForgetRetainDataset(**unlearn_splits, anchor=anchor)
-
-        
-
-#         data["train"] = unlearn_dataset
-#         for split in unlearn_splits:
-#             data.pop(split)
-#     return data
-
 def get_data(data_cfg: DictConfig, mode="train", **kwargs):
     data = {}
     data_cfg = dict(data_cfg)
@@ -132,91 +109,6 @@ def get_collators(collator_cfgs, **kwargs):
 
 
 # def get_federated_data(data, num_clients=3, target_client_idx=0):
-#     """
-#     将数据分割并分配给各个客户端
-    
-#     Args:
-#         data: 数据字典，包含train键，train是ForgetRetainDataset或包含forget/retain子键的字典
-#         num_clients: 客户端数量，默认为3
-#         target_client_idx: 接收forget数据的目标客户端索引，默认为0
-    
-#     Returns:
-#         federated_data: 分配给各个客户端的数据字典
-#     """
-#     # 检查数据结构
-#     # train_data = data.get("forget")
-#     # if train_data is None:
-#     #     raise ValueError("Train data not found")
-    
-#     # # 如果train_data是ForgetRetainDataset，直接访问其forget和retain属性
-#     # if hasattr(train_data, "forget") and hasattr(train_data, "retain"):
-#     #     forget_data = train_data.forget
-#     #     retain_data = train_data.retain
-#     # # 如果train_data是字典，检查是否包含forget和retain键
-#     # elif isinstance(train_data, dict) and "forget" in train_data and "retain" in train_data:
-#     #     forget_data = train_data["forget"]
-#     #     retain_data = train_data["retain"]
-#     # else:
-#     #     raise ValueError("Failed to locate forget and retain data in the provided dataset")
-    
-#     # if forget_data is None or retain_data is None:
-#     #     raise ValueError("Both forget and retain data must be provided")
-    
-
-#     forget_data = data["forget"]
-#     retain_data = data["retain"]
-#     # 创建联邦数据字典
-#     federated_data = {}
-    
-#     # 为每个客户端创建空数据字典
-#     for client_idx in range(num_clients):
-#         federated_data[client_idx] = {}
-    
-#     # 目标客户端获取所有forget数据
-#     federated_data[target_client_idx]["forget"] = forget_data
-    
-#     # 将retain数据平均分配给所有客户端
-#     if isinstance(retain_data, dict):
-#         # 如果retain_data是字典，需要对每个数据集进行分割
-#         for dataset_name, dataset in retain_data.items():
-#             data_len = len(dataset)
-#             chunk_size = data_len // num_clients
-#             for client_idx in range(num_clients):
-#                 start_idx = client_idx * chunk_size
-#                 end_idx = start_idx + chunk_size if client_idx < num_clients - 1 else data_len
-#                 if dataset_name not in federated_data[client_idx]:
-#                     federated_data[client_idx][dataset_name] = []
-#                 federated_data[client_idx][dataset_name] = dataset[start_idx:end_idx]
-#     else:
-#         # 如果retain_data是单个数据集，直接分割
-#         data_len = len(retain_data)
-#         chunk_size = data_len // num_clients
-#         for client_idx in range(num_clients):
-#             start_idx = client_idx * chunk_size
-#             end_idx = start_idx + chunk_size if client_idx < num_clients - 1 else data_len
-#             federated_data[client_idx]["retain"] = retain_data[start_idx:end_idx]
-    
-#     # 为了适配ForgetRetainDataset，对每个客户端创建数据集
-#     for client_idx in range(num_clients):
-#         client_data = federated_data[client_idx]
-        
-#         # 只有目标客户端有forget数据，其他客户端的forget数据设为None
-#         if client_idx != target_client_idx:
-#             client_data["forget"] = None
-        
-#         # 使用ForgetRetainDataset包装数据
-#         client_data = ForgetRetainDataset(
-#             forget=client_data.get("forget"),
-#             retain=client_data.get("retain"),
-#             anchor="retain" if client_idx != target_client_idx else "forget"
-#         )
-        
-#         federated_data[client_idx] = client_data
-    
-#     return federated_data
-
-
-# def get_federated_data(data, num_clients=3, target_client_idx=0):
 #     """将数据集分配给多个客户端，目标客户端包含 forget 数据"""
 #     forget_data = data["forget"]
 #     retain_data = data["retain"]
@@ -228,53 +120,82 @@ def get_collators(collator_cfgs, **kwargs):
 #     for client_idx in range(num_clients):
 #         start_idx = client_idx * chunk_size
 #         end_idx = start_idx + chunk_size if client_idx < num_clients - 1 else data_len
-#         client_retain_data = retain_data[start_idx:end_idx]
+        
+#         # 直接使用列表切片而不是Subset
+#         # 提取实际数据项到列表中
+#         client_retain_items = []
+#         for i in range(start_idx, end_idx):
+#             client_retain_items.append(retain_data[i])
         
 #         if client_idx == target_client_idx:
 #             federated_data[client_idx] = {
 #                 "forget": forget_data,
-#                 "retain": client_retain_data
+#                 "retain": client_retain_items
 #             }
 #         else:
 #             federated_data[client_idx] = {
-#                 "retain": client_retain_data
+#                 "retain": client_retain_items
 #             }
+    
     
 #     return federated_data
 
+def get_federated_data(data, num_clients=3, target_client_idx=0, anchor="retain"):
+    """
+    联邦数据分配（完全类型一致版）
+    确保所有客户端的 retain 和 forget 均为 ForgetRetainDataset 类型
+    """
+    # 提取原始数据集（必须均为 ForgetRetainDataset 类型）
+    original_retain: ForgetRetainDataset = data["retain"]
+    original_forget: ForgetRetainDataset = data["forget"]
 
+    # 参数校验
+    if target_client_idx >= num_clients:
+        raise ValueError(f"Target client index {target_client_idx} >= num_clients {num_clients}")
+    if not isinstance(original_retain, ForgetRetainDataset) or not isinstance(original_forget, ForgetRetainDataset):
+        raise TypeError("输入数据集必须为 ForgetRetainDataset 类型")
 
+    # 分割 retain 数据集
+    retain_len = len(original_retain.retain)  # 原始 retain 数据的实际长度
+    chunk_size = retain_len // num_clients
 
-def get_federated_data(data, num_clients=3, target_client_idx=0):
-    """将数据集分配给多个客户端，目标客户端包含 forget 数据"""
-    forget_data = data["forget"]
-    retain_data = data["retain"]
-    
-    federated_data = {}
-    data_len = len(retain_data)
-    chunk_size = data_len // num_clients
-
-    # print("All forget data:")
-    # for i in range(len(data["forget"])):
-    #     print(f"Sample {i}:", data["forget"][i])
-    
+    client_datasets = {}
     for client_idx in range(num_clients):
-        start_idx = client_idx * chunk_size
-        end_idx = start_idx + chunk_size if client_idx < num_clients - 1 else data_len
-        # 使用 Subset 替代直接切片
-        client_retain_data = Subset(retain_data, range(start_idx, end_idx))
-        
+        # 分割 retain 的索引（基于原始 retain 数据的真实长度）
+        start = client_idx * chunk_size
+        end = start + chunk_size if client_idx < num_clients-1 else retain_len
+        retain_indices = list(range(start, end))
+
+        # 创建客户端的 retain 数据集（保持 ForgetRetainDataset 类型）
+        client_retain = ForgetRetainDataset(
+            forget=None,  # retain 子集不含 forget 数据
+            retain=Subset(original_retain.retain, retain_indices),  # 分割原始 retain 数据
+            anchor="retain"  # 强制设置为 retain 锚点
+        )
+
+        # 分配 forget 数据
         if client_idx == target_client_idx:
-            federated_data[client_idx] = {
-                "forget": forget_data,
-                "retain": client_retain_data
-            }
+            # 目标客户端获得完整 forget 数据集
+            client_forget = original_forget
         else:
-            federated_data[client_idx] = {
-                "retain": client_retain_data
-            }
-    
-    return federated_data
+            # 非目标客户端的 forget 设为空
+            client_forget = ForgetRetainDataset(forget=None, retain=None, anchor="retain")
+
+        # 创建客户端最终数据集
+        client_dataset = ForgetRetainDataset(
+            forget=client_forget,
+            retain=client_retain,
+            anchor=anchor
+        )
+
+        client_datasets[client_idx] = client_dataset
+
+        # 类型验证
+        print(f"客户端 {client_idx} 数据类型验证:")
+        print(f"  forget 类型: {type(client_dataset.forget)}")  # 应输出 ForgetRetainDataset
+        print(f"  retain 类型: {type(client_dataset.retain)}")  # 应输出 ForgetRetainDataset
+
+    return client_datasets
 
 # Register datasets
 _register_data(QADataset)

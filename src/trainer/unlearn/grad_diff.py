@@ -39,7 +39,10 @@ class GradDiff(UnlearnTrainer):
         return retain_loss
 
     def compute_loss(self, model, inputs, return_outputs=False):
+
+        print("--------------------grad_diff start--------------------")
         forget_inputs = inputs["forget"]
+        forget_inputs = forget_inputs["forget"]
         forget_inputs = {
             "input_ids": forget_inputs["input_ids"],
             "attention_mask": forget_inputs["attention_mask"],
@@ -50,6 +53,7 @@ class GradDiff(UnlearnTrainer):
         forget_loss = -forget_outputs.loss
 
         retain_inputs = inputs["retain"]
+        retain_inputs = retain_inputs["retain"]
         retain_inputs = {
             "input_ids": retain_inputs["input_ids"],
             "attention_mask": retain_inputs["attention_mask"],

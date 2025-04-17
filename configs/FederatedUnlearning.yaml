@@ -1,0 +1,61 @@
+# Federated Unlearning Configuration
+model:
+  model_name_or_path: "facebook/opt-125m"  # 预训练模型路径
+  cache_dir: null
+
+tokenizer:
+  tokenizer_name_or_path: "facebook/opt-125m"  # 分词器路径
+  cache_dir: null
+
+data:
+  train_file: "data/toxic_pile/train.json"  # 训练数据文件
+  validation_file: "data/toxic_pile/validation.json"  # 验证数据文件
+  test_file: "data/toxic_pile/test.json"  # 测试数据文件
+  text_column: "text"  # 文本列名
+  preprocessing_num_workers: 4
+
+training:
+  output_dir: "output/federated_unlearning"  # 输出目录
+  seed: 42
+  do_train: true
+  do_eval: true
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 8
+  gradient_accumulation_steps: 1
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  num_train_epochs: 3
+  warmup_ratio: 0.1
+  logging_steps: 50
+  save_total_limit: 3
+  save_steps: 100
+  evaluation_strategy: "steps"
+  eval_steps: 500
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  greater_is_better: false
+  fp16: true
+
+unlearning:
+  forget_file: "data/toxic_pile/forget.json"  # 需要遗忘的数据
+  retain_file: "data/toxic_pile/retain.json"  # 需要保留的数据
+  unlearning_method: "FederatedUnlearning"  # 遗忘方法
+
+# 联邦学习特定配置
+federated:
+  num_clients: 5  # 客户端数量
+  target_client_idx: 0  # 遗忘目标客户端索引
+  client_epochs: 2  # 每个客户端的训练轮数
+  aggregation_strategy: "fedavg"  # 聚合策略: fedavg, weighted
+
+# 隐私和安全配置
+privacy:
+  enable_differential_privacy: false  # 是否启用差分隐私
+  noise_multiplier: 1.0  # 噪声乘数
+  max_grad_norm: 1.0  # 梯度裁剪范数
+
+# 评估配置
+evaluation:
+  membership_inference: true  # 是否进行成员推断攻击评估
+  privacy_risk: true  # 是否评估隐私风险
+  utility_metrics: ["perplexity", "accuracy"]  # 效用指标 

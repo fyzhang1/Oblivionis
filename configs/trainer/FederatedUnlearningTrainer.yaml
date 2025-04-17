@@ -2,7 +2,7 @@ handler: FederatedUnlearningTrainer
 method_args:
   num_clients: 3
   target_client_idx: 0
-  unlearn_trainer_cls: "GradAscent"  # 可以是GradAscent, GradDiff, NPO, DPO, SimNPO, RMU
+  unlearn_trainer_cls: "GradDiff"  # 可以是GradAscent, GradDiff, NPO, DPO, SimNPO, RMU
   aggregation_strategy: "average"
 
 args:

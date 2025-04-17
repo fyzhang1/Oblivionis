@@ -6,7 +6,7 @@ from typing import Dict, List, Any, Optional
 from trainer.base import FinetuneTrainer
 from trainer.unlearn.base import UnlearnTrainer
 from data.unlearn import ForgetRetainDataset
-
+from torch.utils.data import Dataset
 logger = logging.getLogger(__name__)
 
 class FederatedUnlearningTrainer(FinetuneTrainer):
@@ -32,7 +32,8 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         self.federated_dataset = train_dataset if isinstance(train_dataset, dict) else None
         dummy_train_dataset = None
         if self.federated_dataset and 0 in self.federated_dataset:
-            dummy_train_dataset = self.federated_dataset[0].get("retain")
+            dummy_train_dataset = self.federated_dataset[0].retain
+            # dummy_train_dataset = self.federated_dataset[0].get("retain")
         
         super().__init__(
             model=model,
@@ -48,7 +49,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         # logger.info(f"Training args: {self.args}")
         self.num_clients = num_clients
         self.target_client_idx = target_client_idx
-        self.unlearn_trainer_cls = unlearn_trainer_cls or "GradAscent"
+        self.unlearn_trainer_cls = unlearn_trainer_cls
         self.aggregation_strategy = aggregation_strategy
         self.client_models = []
         self.kwargs = kwargs
@@ -99,66 +100,53 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         self._aggregate_models()
         self.save_state()
         return None
-    
-    # def _unlearn_client_model(self, client_model, client_dataset):
-    #     """对目标客户端执行遗忘训练，只使用 forget 数据"""
-    #     from trainer import TRAINER_REGISTRY
-    #     trainer_cls = TRAINER_REGISTRY.get(self.unlearn_trainer_cls, None)
-    #     if trainer_cls is None:
-    #         from trainer.unlearn.grad_ascent import GradAscent
-    #         trainer_cls = GradAscent
-        
-    #     # 只使用 forget 数据进行遗忘训练
-    #     forget_data = client_dataset.get("forget")
-    #     if forget_data is None:
-    #         raise ValueError(f"Client {self.target_client_idx} has no forget data!")
-        
-    #     unlearn_trainer = trainer_cls(
-    #         model=client_model,
-    #         train_dataset=forget_data,
-    #         tokenizer=self.tokenizer,
-    #         data_collator=self.data_collator,
-    #         args=self.args,
-    #         evaluator=self.evaluator,
-    #         template_args=self.template_args,
-    #         **self.kwargs
-    #     )
-    #     unlearn_trainer.train()
-    #     return unlearn_trainer
 
     def _unlearn_client_model(self, client_model, client_dataset):
-        """对目标客户端执行遗忘训练，只使用 forget 数据"""
-
-        # logger.info(f"Passing args to Unlearning: {self.args}")
         from trainer import TRAINER_REGISTRY
         trainer_cls = TRAINER_REGISTRY.get(self.unlearn_trainer_cls, None)
-        if trainer_cls is None:
-            from trainer.unlearn.grad_ascent import GradAscent
-            trainer_cls = GradAscent
         
-        # 从 client_dataset 中获取 forget 数据
-        forget_dataset = client_dataset.get("forget")
-        if forget_dataset is None:
-            raise ValueError(f"Client {self.target_client_idx} has no forget data!")
+        # 获取 forget 和 retain 数据
+        forget_dataset = client_dataset.forget
+        retain_dataset = client_dataset.retain
         
-        # 检查 forget_dataset 是否是 ForgetRetainDataset，并提取其 forget 属性
-        if isinstance(forget_dataset, ForgetRetainDataset):
-            forget_data = forget_dataset.forget
-            if forget_data is None:
-                raise ValueError("ForgetRetainDataset.forget is None")
-        else:
-            forget_data = forget_dataset
+        logger.info(f"forget_data length: {len(forget_dataset)}")
+        logger.info(f"retain_data length: {len(retain_dataset)}")
+        logger.info(f"forget_data type: {type(forget_dataset)}")
+        logger.info(f"retain_data type: {type(retain_dataset)}")
+        logger.info(f"client_dataset type: {type(client_dataset)}")
+        # print(forget_dataset[0])
+
+        forget_data = forget_dataset.forget
+        retain_data = retain_dataset.retain
+        print(forget_data[0])
+        print(retain_data[0])
+
+        class CombinedDataset(Dataset):
+            """合并 Forget 和 Retain 数据集的适配器"""
+            def __init__(self, forget_data, retain_data):
+                self.forget_data = forget_data
+                self.retain_data = retain_data
+                # assert len(forget_data) == len(retain_data), "数据长度必须一致"
+
+            def __len__(self):
+                return len(self.forget_data)
+
+            def __getitem__(self, idx):
+                return {
+                    "forget": self.forget_data[idx],
+                    "retain": self.retain_data[idx]
+                }
         
-        # 调试数据格式
-        logger.info(f"forget_data type: {type(forget_data)}")
-        logger.info(f"forget_data length: {len(forget_data)}")
-        sample = forget_data[0]
-        logger.info(f"Sample type: {type(sample)}")
-        logger.info(f"Sample content: {sample}")
+
+        # 创建组合数据集
+        combined_dataset = CombinedDataset(forget_dataset, retain_dataset)
+        print(type(combined_dataset))
+        print(self.unlearn_trainer_cls)
         
+        # 创建训练器
         unlearn_trainer = trainer_cls(
             model=client_model,
-            train_dataset=forget_data,
+            train_dataset=combined_dataset,
             tokenizer=self.tokenizer,
             data_collator=self.data_collator,
             args=self.args,
@@ -167,20 +155,18 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             **self.kwargs
         )
         
+        # 执行训练
         unlearn_trainer.train()
-
-        for key, param in client_model.state_dict().items():
-            if param.numel() == 0:
-                logger.warning(f"Client model has empty parameter after unlearning: {key}")
-            else:
-                logger.info(f"Unlearn client parameter {key} size: {param.size()}")
+        
         return unlearn_trainer
-
+    
 
     def _train_client_model(self, client_model, client_dataset):
-        retain_data = client_dataset.get("retain")
+        retain_dataset = client_dataset.retain
         if retain_data is None:
             raise ValueError(f"Client has no retain data!")
+
+        retain_data = retain_dataset.retain
         
         # 提取 'retain' 子字典
         logger.info(f"retain_data type: {type(retain_data)}")
@@ -190,13 +176,13 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         logger.info(f"Sample content: {sample}")
         
         # 转换为干净的样本列表
-        filtered_retain_data = [sample['retain'] for sample in retain_data]
+        # filtered_retain_data = [sample['retain'] for sample in retain_data]
 
-        logger.info(f"Filtered retain_data sample: {filtered_retain_data[0]}")
+        # logger.info(f"Filtered retain_data sample: {filtered_retain_data[0]}")
         
         trainer = FinetuneTrainer(
             model=client_model,
-            train_dataset=filtered_retain_data,
+            train_dataset=retain_data,
             tokenizer=self.tokenizer,
             data_collator=self.data_collator,
             args=self.args,

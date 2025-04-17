@@ -7,13 +7,14 @@ from evals import get_evaluator
 from trainer.utils import seed_everything
 
 
-# python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test
+# python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test1
+
 
 """
-CUDA_VISIBLE_DEVICES=0,1 accelerate launch \
-  --config_file configs/accelerate/default_config.yaml --main_process_port 18765 \
-  src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test
+微调
+python src/train.py --config-name=train.yaml experiment=finetune/tofu/default task_name=SAMPLE_TRAIN
 
+python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test1
 
 # python src/eval.py  experiment=eval/tofu/default.yaml task_name=test
 
