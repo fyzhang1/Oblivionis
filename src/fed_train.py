@@ -9,6 +9,17 @@ from trainer.utils import seed_everything
 
 # python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test1
 
+""""
+fintune的eval
+        CUDA_VISIBLE_DEVICES=0 python src/eval.py experiment=eval/tofu/default.yaml \
+        forget_split=forget10 \
+        holdout_split=retain90\
+        task_name=SAMPLE_TRAIN \
+        model=${model} \
+        model.model_args.pretrained_model_name_or_path=saves/finetune/tofu_${model}_full \
+        retain_logs_path=saves/eval/tofu_${model}_${retain_split}/TOFU_EVAL.json \
+        paths.output_dir=saves/eval/tofu_${model}_full/evals_${forget_split}
+"""
 
 """
 微调
@@ -18,16 +29,17 @@ python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/defau
 
 # python src/eval.py  experiment=eval/tofu/default.yaml task_name=test
 
-  
+python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=Fed_Grad_diff \model=Llama-3.2-3B-Instruct \model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
 
+unlearn's eval
             CUDA_VISIBLE_DEVICES=0 python src/eval.py \
             experiment=eval/tofu/default.yaml \
             forget_split=forget10 \
             holdout_split=retain90 \
-            task_name=test \
-            model.model_args.pretrained_model_name_or_path=saves/unlearn/test \
-            paths.output_dir=saves/unlearn/test/evals \
-            retain_logs_path=saves/eval/test/TOFU_EVAL.json
+            task_name=Fed_Grad_diff \
+            model.model_args.pretrained_model_name_or_path=saves/unlearn/Fed_Grad_diff \
+            paths.output_dir=saves/unlearn/Fed_Grad_diff/evals \
+            retain_logs_path=saves/eval/SAMPLE_TRAIN/TOFU_EVAL.json
 
 """
 @hydra.main(version_base=None, config_path="../configs", config_name="train.yaml")

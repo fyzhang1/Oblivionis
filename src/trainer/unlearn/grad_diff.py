@@ -40,7 +40,6 @@ class GradDiff(UnlearnTrainer):
 
     def compute_loss(self, model, inputs, return_outputs=False):
 
-        print("--------------------grad_diff start--------------------")
         forget_inputs = inputs["forget"]
         forget_inputs = forget_inputs["forget"]
         forget_inputs = {
