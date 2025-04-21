@@ -41,10 +41,12 @@ class NPO(GradDiff):
     def compute_loss(self, model, inputs, return_outputs=False):
         # forget_inputs = inputs["forget"]
 
+        forget_inputs = inputs["forget"]
+        forget_inputs = forget_inputs["forget"]
         forget_inputs = {
-            "input_ids": inputs["input_ids"],
-            "attention_mask": inputs["attention_mask"],
-            "labels": inputs.get("labels", None),  # labels 可能为 None
+            "input_ids": forget_inputs["input_ids"],
+            "attention_mask": forget_inputs["attention_mask"],
+            "labels": forget_inputs.get("labels", None),  # labels 可能为 None
         }
 
         forget_loss, forget_outputs = compute_dpo_loss(
@@ -56,6 +58,7 @@ class NPO(GradDiff):
         )
 
         retain_inputs = inputs["retain"]
+        retain_inputs = retain_inputs["retain"]
         retain_inputs = {
             "input_ids": retain_inputs["input_ids"],
             "attention_mask": retain_inputs["attention_mask"],

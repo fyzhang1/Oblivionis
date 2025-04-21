@@ -138,6 +138,7 @@ class RMU(GradDiff):
 
     def compute_loss(self, model, inputs, return_outputs=False):
         forget_inputs = inputs["forget"]
+        forget_inputs = forget_inputs["forget"]
         forget_inputs = {
             "input_ids": forget_inputs["input_ids"],
             "attention_mask": forget_inputs["attention_mask"],
@@ -161,6 +162,7 @@ class RMU(GradDiff):
         )
 
         retain_inputs = inputs["retain"]
+        retain_inputs = retain_inputs["retain"]
         retain_inputs = {
             "input_ids": retain_inputs["input_ids"],
             "attention_mask": retain_inputs["attention_mask"],

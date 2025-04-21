@@ -12,6 +12,7 @@ class SimNPO(GradDiff):
 
     def compute_loss(self, model, inputs, return_outputs=False):
         forget_inputs = inputs["forget"]
+        forget_inputs = forget_inputs["forget"]
 
         forget_labels = forget_inputs["labels"]
         loss_mask = forget_labels != -100
@@ -20,6 +21,7 @@ class SimNPO(GradDiff):
         forget_loss = -F.logsigmoid(self.beta * forget_loss).mean() * 2 / self.beta
 
         retain_inputs = inputs["retain"]
+        retain_inputs = retain_inputs["retain"]
         retain_inputs = {
             "input_ids": retain_inputs["input_ids"],
             "attention_mask": retain_inputs["attention_mask"],

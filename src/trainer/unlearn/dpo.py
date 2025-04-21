@@ -10,8 +10,11 @@ class DPO(GradDiff):
             self.ref_model = self._prepare_ref_model(self.model)
 
     def compute_loss(self, model, inputs, return_outputs=False):
-        forget_inputs = inputs["forget"]["original"]
-        alternate_inputs = inputs["forget"]["alternate"]
+
+        forget_inputs = inputs["forget"]
+        print(forget_inputs)
+        forget_inputs = forget_inputs["forget"]["original"]
+        alternate_inputs = forget_inputs["forget"]["alternate"]
 
         forget_loss, forget_outputs = compute_dpo_loss(
             model=model,
@@ -22,6 +25,7 @@ class DPO(GradDiff):
         )
 
         retain_inputs = inputs["retain"]
+        retain_inputs = retain_inputs["retain"]
         retain_inputs = {
             "input_ids": retain_inputs["input_ids"],
             "attention_mask": retain_inputs["attention_mask"],

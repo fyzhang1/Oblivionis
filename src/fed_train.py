@@ -27,6 +27,10 @@ python src/train.py --config-name=train.yaml experiment=finetune/tofu/default ta
 
 python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test1
 
+DPO:unlearn/tofu/idk.yaml
+python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/idk \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test1
+
+
 # python src/eval.py  experiment=eval/tofu/default.yaml task_name=test
 
 python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=Fed_Grad_diff \model=Llama-3.2-3B-Instruct \model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
