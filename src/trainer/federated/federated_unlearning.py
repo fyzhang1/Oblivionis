@@ -122,7 +122,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             self._aggregate_models()
             logger.info(f"Completed global round {round_idx + 1}/{self.global_rounds}")
             
-            # 每轮保存一次状态
+            # 保存状态
             if self.args.save_strategy == "epoch" or (round_idx == self.global_rounds - 1):
                 save_path = f"{self.args.output_dir}/round_{round_idx + 1}"
                 self.save_model(save_path)
