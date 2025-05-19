@@ -35,6 +35,20 @@ def FedAvg(client_state_dicts, global_model_state_dict=None):
     return global_state_dict
 
 
+def FedProx(client_state_dicts, global_model_state_dict=None, mu=0.01):
+    """
+    
+    Args:
+        client_state_dicts: 客户端模型状态字典列表
+        global_model_state_dict: 全局模型状态字典
+        mu: 正则化系数，仅用于记录
+        
+    Returns:
+        全局聚合后的状态字典
+    """
+    # FedProx的聚合方式与FedAvg相同，区别在于客户端训练阶段
+    return FedAvg(client_state_dicts, global_model_state_dict)
+
 def FedAvgM(client_state_dicts: List[Dict], global_model_state_dict: Dict,
                         server_momentum: Dict = None, momentum_factor: float = 0.9) -> Tuple[Dict, Dict]:
     """

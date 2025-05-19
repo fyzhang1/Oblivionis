@@ -1,5 +1,4 @@
-export MASTER_PORT=$(python -c "import socket; s=socket.socket(); s.bind(('', 0)); print(s.getsockname()[1]); s.close()")
-echo "Master Port: $MASTER_PORT"
+# bash scripts/fed_tofu.sh
 
 models=(
     "Llama-3.2-1B-Instruct"
@@ -26,7 +25,7 @@ unlearn_trainer_cls_es=(
     "RMU"
 )
 
-per_device_train_batch_size=4 # on two gpus would make effective batch size 32
+per_device_train_batch_size=4
 gradient_accumulation_steps=4
 
 ########################################################################################################################
@@ -45,22 +44,19 @@ for split in "${splits[@]}"; do
                 model_path=open-unlearning/tofu_${model}_full
                 echo ${task_name}: Federated Unlearning ${model_path} using ${unlearn_trainer_cls} with ${aggregation_strategy}
 
-                # Federated Unlearn
-                python src/fed_train.py --config-name=unlearn.yaml \
+                CUDA_VISIBLE_DEVICES=0 python src/fed_train.py --config-name=unlearn.yaml \
                 experiment=unlearn/tofu/default.yaml \
                 trainer=FederatedUnlearningTrainer \
                 task_name=${task_name} \
                 model=${model} \
                 forget_split=${forget_split} \
                 retain_split=${retain_split} \
-                model.method_args.aggregation_strategy=${aggregation_strategy} \
-                model.method_args.unlearn_trainer_cls=${unlearn_trainer_cls} \
+                +model.method_args.aggregation_strategy=${aggregation_strategy} \
+                +model.method_args.unlearn_trainer_cls=${unlearn_trainer_cls} \
                 model.model_args.pretrained_model_name_or_path=${model_path} \
                 retain_logs_path=saves/eval/tofu_${model}_${retain_split}/TOFU_EVAL.json \
                 trainer.args.per_device_train_batch_size=$per_device_train_batch_size \
-                trainer.args.gradient_accumulation_steps=$gradient_accumulation_steps \
-                trainer.args.ddp_find_unused_parameters=true \
-                trainer.args.gradient_checkpointing=true
+                trainer.args.gradient_accumulation_steps=$gradient_accumulation_steps 
 
                 # Eval
                 CUDA_VISIBLE_DEVICES=0 python src/eval.py \

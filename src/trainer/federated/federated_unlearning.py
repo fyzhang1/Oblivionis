@@ -8,7 +8,6 @@ from trainer.unlearn.base import UnlearnTrainer
 from data.unlearn import ForgetRetainDataset
 from torch.utils.data import Dataset
 from trainer.federated.federated_utils import *
-
 logger = logging.getLogger(__name__)
 
 class FederatedUnlearningTrainer(FinetuneTrainer):
@@ -175,18 +174,73 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         print(self.unlearn_trainer_cls)
 
         logger.info(f"Unlearning_cls_name: {self.unlearn_trainer_cls}")
+
+
+        #测试改进部分-----------------------------
+        if self.aggregation_strategy == "FedProx":
+            # 创建FedProx版本的遗忘训练器
+            class FedProxUnlearnTrainer(trainer_cls):
+                def __init__(self, *args, global_model=None, mu=0.01, **kwargs):
+                    super().__init__(*args, **kwargs)
+                    self.global_model = global_model
+                    self.mu = mu
+                
+                def compute_loss(self, model, inputs, return_outputs=False):
+                    # 获取原始损失
+                    loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
+                    
+                    # 添加FedProx正则项
+                    proximal_term = 0.0
+                    if self.global_model is not None:
+                        for w, w_t in zip(model.parameters(), self.global_model.parameters()):
+                            if w.requires_grad:
+                                proximal_term += torch.norm(w - w_t.detach()) ** 2
+                        
+                        # 应用μ/2系数
+                        proximal_term = (self.mu / 2) * proximal_term
+                        loss += proximal_term
+                    
+                    return (loss, outputs) if return_outputs else loss
+            
+            print("使用prox")
+            unlearn_trainer = FedProxUnlearnTrainer(
+                model=client_model,
+                train_dataset=combined_dataset,
+                tokenizer=self.tokenizer,
+                data_collator=self.data_collator,
+                args=self.args,
+                evaluator=self.evaluator,
+                template_args=self.template_args,
+                global_model=self.model,  # 传递全局模型
+                mu=self.fed_args['mu'],   # 传递mu参数
+                **self.kwargs
+            )
+        else:
+            # 使用标准训练器
+            unlearn_trainer = trainer_cls(
+                model=client_model,
+                train_dataset=combined_dataset,
+                tokenizer=self.tokenizer,
+                data_collator=self.data_collator,
+                args=self.args,
+                evaluator=self.evaluator,
+                template_args=self.template_args,
+                **self.kwargs
+            )
+        
+        #测试改进部分-----------------------------
         
         # 创建训练器
-        unlearn_trainer = trainer_cls(
-            model=client_model,
-            train_dataset=combined_dataset,
-            tokenizer=self.tokenizer,
-            data_collator=self.data_collator,
-            args=self.args,
-            evaluator=self.evaluator,
-            template_args=self.template_args,
-            **self.kwargs
-        )
+        # unlearn_trainer = trainer_cls(
+        #     model=client_model,
+        #     train_dataset=combined_dataset,
+        #     tokenizer=self.tokenizer,
+        #     data_collator=self.data_collator,
+        #     args=self.args,
+        #     evaluator=self.evaluator,
+        #     template_args=self.template_args,
+        #     **self.kwargs
+        # )
         
         # 执行训练
         unlearn_trainer.train()
@@ -212,16 +266,71 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         # filtered_retain_data = [sample['retain'] for sample in retain_data]
 
         # logger.info(f"Filtered retain_data sample: {filtered_retain_data[0]}")
+
+            # 根据聚合策略选择训练器
+        if self.aggregation_strategy == "FedProx":
+            class FedProxTrainer(FinetuneTrainer):
+    
+                def __init__(self, *args, global_model=None, mu=0.01, **kwargs):
+                    super().__init__(*args, **kwargs)
+                    self.global_model = global_model
+                    self.mu = mu
+                
+                def compute_loss(self, model, inputs, return_outputs=False):
+                    """添加FedProx正则项到损失函数"""
+                    # 计算原始损失
+                    outputs = model(**inputs)
+                    loss = outputs.loss
+                    
+                    # 添加FedProx正则项
+                    proximal_term = 0.0
+                    if self.global_model is not None:
+                        for w, w_t in zip(model.parameters(), self.global_model.parameters()):
+                            if w.requires_grad:
+                                proximal_term += torch.norm(w - w_t.detach()) ** 2
+                                
+                        # 乘以μ/2系数
+                        proximal_term = (self.mu / 2) * proximal_term
+                        loss += proximal_term
+                        
+                    return (loss, outputs) if return_outputs else loss
+                
+            # 使用FedProx训练器
+            trainer = FedProxTrainer(
+                model=client_model,
+                train_dataset=retain_data,
+                tokenizer=self.tokenizer,
+                data_collator=self.data_collator,
+                args=self.args,
+                evaluator=self.evaluator,
+                template_args=self.template_args,
+                global_model=self.model,  # 传入全局模型作为参考
+                mu=self.fed_args['mu']    # 传入mu参数
+            )
+        else:
+            # 使用默认训练器
+            trainer = FinetuneTrainer(
+                model=client_model,
+                train_dataset=retain_data,
+                tokenizer=self.tokenizer,
+                data_collator=self.data_collator,
+                args=self.args,
+                evaluator=self.evaluator,
+                template_args=self.template_args,
+            )
         
-        trainer = FinetuneTrainer(
-            model=client_model,
-            train_dataset=retain_data,
-            tokenizer=self.tokenizer,
-            data_collator=self.data_collator,
-            args=self.args,
-            evaluator=self.evaluator,
-            template_args=self.template_args,
-        )
+        # trainer.train()
+        # return trainer
+        
+        # trainer = FinetuneTrainer(
+        #     model=client_model,
+        #     train_dataset=retain_data,
+        #     tokenizer=self.tokenizer,
+        #     data_collator=self.data_collator,
+        #     args=self.args,
+        #     evaluator=self.evaluator,
+        #     template_args=self.template_args,
+        # )
         trainer.train()
         # for key, param in client_model.state_dict().items():
         #     if param.numel() == 0:
@@ -284,6 +393,13 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                     epsilon=self.fed_args['epsilon'],
                     tau=self.fed_args['tau']
                 )
-        
+        elif self.aggregation_strategy == "FedProx":
+                global_state_dict = FedProx(
+                    client_state_dicts,
+                    global_model_state_dict=self.model.state_dict(),
+                    mu=self.fed_args['mu']
+                )
         self.model.load_state_dict(global_state_dict)
         logger.info("Global model updated")
+
+
