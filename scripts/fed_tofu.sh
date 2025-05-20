@@ -11,18 +11,18 @@ splits=(
     "forget10 holdout10 retain90"
 )
 aggregation_strategys=(
-    "FedAvg"
     "FedAdam"
-    "FedYogi"
     "FedAdagrad"
+    "FedAvg"
     "FedAvgM"
+    "FedYogi"
 )
 unlearn_trainer_cls_es=(
     "GradAscent"
     "GradDiff"
     "NPO"
-    "SimNPO"
     "RMU"
+    "SimNPO"
 )
 
 per_device_train_batch_size=4

@@ -1,21 +1,21 @@
 # Federated Unlearning Configuration
 model:
-  model_name_or_path: "facebook/opt-125m"  # 预训练模型路径
+  model_name_or_path: "facebook/opt-125m"  # Pre-trained Model Path
   cache_dir: null
 
 tokenizer:
-  tokenizer_name_or_path: "facebook/opt-125m"  # 分词器路径
+  tokenizer_name_or_path: "facebook/opt-125m"  # Tokenizer Path
   cache_dir: null
 
 data:
-  train_file: "data/toxic_pile/train.json"  # 训练数据文件
-  validation_file: "data/toxic_pile/validation.json"  # 验证数据文件
-  test_file: "data/toxic_pile/test.json"  # 测试数据文件
-  text_column: "text"  # 文本列名
+  train_file: "data/toxic_pile/train.json"  # Training Data File
+  validation_file: "data/toxic_pile/validation.json"  # Validation Data File
+  test_file: "data/toxic_pile/test.json"  # Test Data File
+  text_column: "text"  # Text Column Name
   preprocessing_num_workers: 4
 
 training:
-  output_dir: "output/federated_unlearning"  # 输出目录
+  output_dir: "output/federated_unlearning"  # Output Directory
   seed: 42
   do_train: true
   do_eval: true
@@ -37,25 +37,25 @@ training:
   fp16: true
 
 unlearning:
-  forget_file: "data/toxic_pile/forget.json"  # 需要遗忘的数据
-  retain_file: "data/toxic_pile/retain.json"  # 需要保留的数据
-  unlearning_method: "FederatedUnlearning"  # 遗忘方法
+  forget_file: "data/toxic_pile/forget.json"  # Data to Be Forgotten
+  retain_file: "data/toxic_pile/retain.json"  # Data to Be Retained
+  unlearning_method: "FederatedUnlearning"  # Unlearning Method
 
-# 联邦学习特定配置
+# Federated Learning Specific Configuration
 federated:
-  num_clients: 5  # 客户端数量
-  target_client_idx: 0  # 遗忘目标客户端索引
-  client_epochs: 2  # 每个客户端的训练轮数
-  aggregation_strategy: "fedavg"  # 聚合策略: fedavg, weighted
+  num_clients: 5  # Number of Clients
+  target_client_idx: 0  # Target Client Index
+  client_epochs: 2  # Number of Training Epochs per Client
+  aggregation_strategy: "fedavg"  # Aggregation Strategy: FedAvg, Weighted
 
-# 隐私和安全配置
+# Privacy and Security Configuration
 privacy:
-  enable_differential_privacy: false  # 是否启用差分隐私
-  noise_multiplier: 1.0  # 噪声乘数
-  max_grad_norm: 1.0  # 梯度裁剪范数
+  enable_differential_privacy: false  # Whether to Enable Differential Privacy
+  noise_multiplier: 1.0  # Noise Multiplier
+  max_grad_norm: 1.0  # Gradient Clipping Norm
 
-# 评估配置
+# Evaluation Configuration
 evaluation:
-  membership_inference: true  # 是否进行成员推断攻击评估
-  privacy_risk: true  # 是否评估隐私风险
-  utility_metrics: ["perplexity", "accuracy"]  # 效用指标 
+  membership_inference: true  # Whether to Perform Membership Inference Attack Evaluation
+  privacy_risk: true  # Whether to Evaluate Privacy Risk
+  utility_metrics: ["perplexity", "accuracy"]  # Utility Metrics
