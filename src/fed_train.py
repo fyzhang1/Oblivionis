@@ -88,7 +88,7 @@ def main(cfg: DictConfig):
         evaluator = get_evaluator(
             eval_name,
             eval_cfg,
-            template_args=template_args,  # 明确作为关键字参数
+            template_args=template_args,
             model=model,
             tokenizer=tokenizer,
         )
