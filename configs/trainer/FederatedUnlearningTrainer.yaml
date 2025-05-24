@@ -3,7 +3,7 @@ method_args:
   num_clients: 3
   target_client_idx: 0
   unlearn_trainer_cls: "GradAscent"  # 可以是GradAscent, GradDiff, NPO, SimNPO, RMU
-  aggregation_strategy: "FedProx"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
+  aggregation_strategy: "FedAvg"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
   global_rounds: 3  # 全局训练轮数设置
 
 args:

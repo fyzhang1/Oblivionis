@@ -89,13 +89,14 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         
         logger.info(f"Starting federated unlearning training with {self.global_rounds} global rounds")
         
-        # 初始化全局模型为我们当前模型
+        # 将全局模型移到CPU，以节省GPU内存
+        self.model = self.model.cpu()
         self.model = deepcopy(self.model)
         
         for round_idx in range(self.global_rounds):
             logger.info(f"Starting global round {round_idx + 1}/{self.global_rounds}")
             
-            # 每轮使用当前全局模型来初始化客户端模型
+            # 在CPU上初始化客户端模型
             self.client_models = [deepcopy(self.model) for _ in range(self.num_clients)]
 
             # 训练客户端模型
@@ -116,6 +117,9 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 else:
                     logger.info(f"Training on client {client_idx}")
                     self._train_client_model(client_model, client_dataset)
+                
+                # 训练完成后将模型移回CPU
+                self.client_models[client_idx] = client_model.cpu()
             
             # 聚合模型 - 结果已经直接更新到self.model
             self._aggregate_models()
@@ -124,6 +128,8 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             # 保存状态
             if self.args.save_strategy == "epoch" or (round_idx == self.global_rounds - 1):
                 save_path = f"{self.args.output_dir}/round_{round_idx + 1}"
+                # 确保模型在CPU上保存
+                self.model = self.model.cpu()
                 self.save_model(save_path)
                 logger.info(f"Model saved at {save_path}")
         
@@ -134,55 +140,37 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         from trainer import TRAINER_REGISTRY
         trainer_cls = TRAINER_REGISTRY.get(self.unlearn_trainer_cls, None)
         
-
-        # <class 'data.unlearn.ForgetRetainDataset'>
         forget_dataset = client_dataset.forget
         retain_dataset = client_dataset.retain
         
         logger.info(f"forget_data length: {len(forget_dataset)}")
         logger.info(f"retain_data length: {len(retain_dataset)}")
-        # logger.info(f"forget_data type: {type(forget_dataset)}") <class 'data.unlearn.ForgetRetainDataset'>
-        # logger.info(f"retain_data type: {type(retain_dataset)}") <class 'data.unlearn.ForgetRetainDataset'>
-        # logger.info(f"client_dataset type: {type(client_dataset)}") <class 'data.unlearn.ForgetRetainDataset'>
-
-
-        # forget_data = forget_dataset.forget
-        # retain_data = retain_dataset.retain
-        # print(forget_data[0])
-        # print(retain_data[0])
 
         class CombinedDataset(Dataset):
-            """合并 Forget 和 Retain 数据集的适配器"""
             def __init__(self, forget_data, retain_data):
                 self.forget_data = forget_data
                 self.retain_data = retain_data
-                # assert len(forget_data) == len(retain_data), "数据长度必须一致"
+                self.retain_length = len(retain_data)
 
             def __len__(self):
                 return len(self.forget_data)
 
             def __getitem__(self, idx):
+                # 对retain数据集进行循环索引
+                retain_idx = idx % self.retain_length
                 return {
                     "forget": self.forget_data[idx],
-                    "retain": self.retain_data[idx]
+                    "retain": self.retain_data[retain_idx]
                 }
         
-
-        # 创建组合数据集
         combined_dataset = CombinedDataset(forget_dataset, retain_dataset)
-        print(type(combined_dataset))
-        print(self.unlearn_trainer_cls)
-
         logger.info(f"Unlearning_cls_name: {self.unlearn_trainer_cls}")
 
-
-        #测试改进部分-----------------------------
         if self.aggregation_strategy == "FedProx":
-            # 创建FedProx版本的遗忘训练器
             class FedProxUnlearnTrainer(trainer_cls):
                 def __init__(self, *args, global_model=None, mu=0.01, **kwargs):
                     super().__init__(*args, **kwargs)
-                    self.global_model = global_model
+                    self.global_model = global_model.to(self.args.device) if global_model is not None else None
                     self.mu = mu
                 
                 def compute_loss(self, model, inputs, return_outputs=False):
@@ -196,13 +184,11 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                             if w.requires_grad:
                                 proximal_term += torch.norm(w - w_t.detach()) ** 2
                         
-                        # 应用μ/2系数
                         proximal_term = (self.mu / 2) * proximal_term
                         loss += proximal_term
                     
                     return (loss, outputs) if return_outputs else loss
             
-            print("使用prox")
             unlearn_trainer = FedProxUnlearnTrainer(
                 model=client_model,
                 train_dataset=combined_dataset,
@@ -211,12 +197,11 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 args=self.args,
                 evaluator=self.evaluator,
                 template_args=self.template_args,
-                global_model=self.model,  # 传递全局模型
-                mu=self.fed_args['mu'],   # 传递mu参数
+                global_model=self.model.cpu(),  # 传递CPU上的全局模型
+                mu=self.fed_args['mu'],
                 **self.kwargs
             )
         else:
-            # 使用标准训练器
             unlearn_trainer = trainer_cls(
                 model=client_model,
                 train_dataset=combined_dataset,
@@ -228,21 +213,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 **self.kwargs
             )
         
-        #测试改进部分-----------------------------
-        
-        # 创建训练器
-        # unlearn_trainer = trainer_cls(
-        #     model=client_model,
-        #     train_dataset=combined_dataset,
-        #     tokenizer=self.tokenizer,
-        #     data_collator=self.data_collator,
-        #     args=self.args,
-        #     evaluator=self.evaluator,
-        #     template_args=self.template_args,
-        #     **self.kwargs
-        # )
-        
-        # 执行训练
+        # 训练器会自动将模型移到正确的设备上
         unlearn_trainer.train()
         
         return unlearn_trainer
@@ -250,52 +221,30 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
 
     def _train_client_model(self, client_model, client_dataset):
         retain_dataset = client_dataset.retain
-        # if retain_data is None:
-        #     raise ValueError(f"Client has no retain data!")
-
         retain_data = retain_dataset.retain
         
-        # 提取 'retain' 子字典
-        # logger.info(f"retain_data type: {type(retain_data)}")
-        # logger.info(f"retain_data length: {len(retain_data)}")
-        # sample = retain_data[0]
-        # logger.info(f"Sample type: {type(sample)}")
-        # logger.info(f"Sample content: {sample}")
-        
-        # 转换为干净的样本列表
-        # filtered_retain_data = [sample['retain'] for sample in retain_data]
-
-        # logger.info(f"Filtered retain_data sample: {filtered_retain_data[0]}")
-
-            # 根据聚合策略选择训练器
         if self.aggregation_strategy == "FedProx":
             class FedProxTrainer(FinetuneTrainer):
-    
                 def __init__(self, *args, global_model=None, mu=0.01, **kwargs):
                     super().__init__(*args, **kwargs)
-                    self.global_model = global_model
+                    self.global_model = global_model.to(self.args.device) if global_model is not None else None
                     self.mu = mu
                 
                 def compute_loss(self, model, inputs, return_outputs=False):
-                    """添加FedProx正则项到损失函数"""
-                    # 计算原始损失
                     outputs = model(**inputs)
                     loss = outputs.loss
                     
-                    # 添加FedProx正则项
                     proximal_term = 0.0
                     if self.global_model is not None:
                         for w, w_t in zip(model.parameters(), self.global_model.parameters()):
                             if w.requires_grad:
                                 proximal_term += torch.norm(w - w_t.detach()) ** 2
                                 
-                        # 乘以μ/2系数
                         proximal_term = (self.mu / 2) * proximal_term
                         loss += proximal_term
                         
                     return (loss, outputs) if return_outputs else loss
                 
-            # 使用FedProx训练器
             trainer = FedProxTrainer(
                 model=client_model,
                 train_dataset=retain_data,
@@ -304,11 +253,10 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 args=self.args,
                 evaluator=self.evaluator,
                 template_args=self.template_args,
-                global_model=self.model,  # 传入全局模型作为参考
-                mu=self.fed_args['mu']    # 传入mu参数
+                global_model=self.model.cpu(),  # 传递CPU上的全局模型
+                mu=self.fed_args['mu']
             )
         else:
-            # 使用默认训练器
             trainer = FinetuneTrainer(
                 model=client_model,
                 train_dataset=retain_data,
@@ -319,87 +267,67 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 template_args=self.template_args,
             )
         
-        # trainer.train()
-        # return trainer
-        
-        # trainer = FinetuneTrainer(
-        #     model=client_model,
-        #     train_dataset=retain_data,
-        #     tokenizer=self.tokenizer,
-        #     data_collator=self.data_collator,
-        #     args=self.args,
-        #     evaluator=self.evaluator,
-        #     template_args=self.template_args,
-        # )
         trainer.train()
-        # for key, param in client_model.state_dict().items():
-        #     if param.numel() == 0:
-        #         logger.warning(f"Client model has empty parameter after training: {key}")
         return trainer
     
 
     def _aggregate_models(self):
-
-        # fedavg
         logger.info("Aggregating client models")
-        client_state_dicts = [model.state_dict() for model in self.client_models]
-        logger.info(f"Aggregation_strategy:{self.aggregation_strategy }")
+        # 确保所有模型都在CPU上进行聚合
+        client_state_dicts = [model.cpu().state_dict() for model in self.client_models]
+        logger.info(f"Aggregation_strategy:{self.aggregation_strategy}")
         
         if self.aggregation_strategy == "FedAvg":
             global_state_dict = FedAvg(
-            client_state_dicts, 
-            global_model_state_dict=self.model.state_dict()
+                client_state_dicts, 
+                global_model_state_dict=self.model.cpu().state_dict()
             )
         elif self.aggregation_strategy == "FedAvgM":
             global_state_dict, self.server_momentum = FedAvgM(
-                    client_state_dicts,
-                    global_model_state_dict=self.model.state_dict(),
-                    server_momentum=self.server_momentum,
-                    momentum_factor=self.fed_args['momentum_factor']
-                )
-                
+                client_state_dicts,
+                global_model_state_dict=self.model.cpu().state_dict(),
+                server_momentum=self.server_momentum,
+                momentum_factor=self.fed_args['momentum_factor']
+            )
         elif self.aggregation_strategy == "FedAdagrad":
-                        global_state_dict, self.server_velocity = FedAdagrad(
-                            client_state_dicts,
-                            global_model_state_dict=self.model.state_dict(),
-                            server_velocity=self.server_velocity,
-                            learning_rate=self.fed_args['server_lr'],
-                            epsilon=self.fed_args['epsilon'],
-                            tau=self.fed_args['tau']
-                )
-                
+            global_state_dict, self.server_velocity = FedAdagrad(
+                client_state_dicts,
+                global_model_state_dict=self.model.cpu().state_dict(),
+                server_velocity=self.server_velocity,
+                learning_rate=self.fed_args['server_lr'],
+                epsilon=self.fed_args['epsilon'],
+                tau=self.fed_args['tau']
+            )
         elif self.aggregation_strategy == "FedYogi":
-                global_state_dict, self.server_velocity, self.server_momentum = FedYogi(
-                    client_state_dicts,
-                    global_model_state_dict=self.model.state_dict(),
-                    server_velocity=self.server_velocity,
-                    server_momentum=self.server_momentum,
-                    learning_rate=self.fed_args['server_lr'],
-                    beta1=self.fed_args['beta1'],
-                    beta2=self.fed_args['beta2'],
-                    epsilon=self.fed_args['epsilon'],
-                    tau=self.fed_args['tau']
-                )
-                
+            global_state_dict, self.server_velocity, self.server_momentum = FedYogi(
+                client_state_dicts,
+                global_model_state_dict=self.model.cpu().state_dict(),
+                server_velocity=self.server_velocity,
+                server_momentum=self.server_momentum,
+                learning_rate=self.fed_args['server_lr'],
+                beta1=self.fed_args['beta1'],
+                beta2=self.fed_args['beta2'],
+                epsilon=self.fed_args['epsilon'],
+                tau=self.fed_args['tau']
+            )
         elif self.aggregation_strategy == "FedAdam":
-                global_state_dict, self.server_velocity, self.server_momentum = FedAdam(
-                    client_state_dicts,
-                    global_model_state_dict=self.model.state_dict(),
-                    server_velocity=self.server_velocity,
-                    server_momentum=self.server_momentum,
-                    learning_rate=self.fed_args['server_lr'],
-                    beta1=self.fed_args['beta1'],
-                    beta2=self.fed_args['beta2'],
-                    epsilon=self.fed_args['epsilon'],
-                    tau=self.fed_args['tau']
-                )
+            global_state_dict, self.server_velocity, self.server_momentum = FedAdam(
+                client_state_dicts,
+                global_model_state_dict=self.model.cpu().state_dict(),
+                server_velocity=self.server_velocity,
+                server_momentum=self.server_momentum,
+                learning_rate=self.fed_args['server_lr'],
+                beta1=self.fed_args['beta1'],
+                beta2=self.fed_args['beta2'],
+                epsilon=self.fed_args['epsilon'],
+                tau=self.fed_args['tau']
+            )
         elif self.aggregation_strategy == "FedProx":
-                global_state_dict = FedProx(
-                    client_state_dicts,
-                    global_model_state_dict=self.model.state_dict(),
-                    mu=self.fed_args['mu']
-                )
+            global_state_dict = FedProx(
+                client_state_dicts,
+                global_model_state_dict=self.model.cpu().state_dict(),
+                mu=self.fed_args['mu']
+            )
+            
         self.model.load_state_dict(global_state_dict)
         logger.info("Global model updated")
-
-

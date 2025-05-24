@@ -44,7 +44,21 @@ retain_logs_path=saves/eval/SAMPLE_TRAIN/TOFU_EVAL.json
 ```python
 The results are saved "saves/unlearn/test/evals" 
 ```
-- retain_logs_path: the reference of initial global's evaluation 
+- retain_logs_path: the reference of initial global's evaluation
+
+##### MUSE: federated training (A100 80G)
+```python
+python src/fed_train.py --config-name=unlearn.yaml \
+experiment=unlearn/muse/default.yaml \
+model=Llama-2-7b-hf \
+data_split=News \
+trainer=FederatedUnlearningTrainer \
+task_name=test \
+retain_logs_path=saves/eval/muse_Llama-2-7b-hf_News_retrain/MUSE_EVAL.json \
+trainer.args.per_device_train_batch_size=2 \
+trainer.args.gradient_accumulation_steps=8
+```
+
 ---------
 ## Acknowledgements
 
