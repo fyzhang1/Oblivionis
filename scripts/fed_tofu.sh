@@ -11,9 +11,9 @@ splits=(
     "forget10 holdout10 retain90"
 )
 aggregation_strategys=(
+    "FedAvg"
     "FedAdam"
     "FedAdagrad"
-    "FedAvg"
     "FedAvgM"
     "FedYogi"
 )
@@ -25,7 +25,7 @@ unlearn_trainer_cls_es=(
     "SimNPO"
 )
 
-per_device_train_batch_size=4
+per_device_train_batch_size=8
 gradient_accumulation_steps=4
 
 ########################################################################################################################
@@ -51,8 +51,8 @@ for split in "${splits[@]}"; do
                 model=${model} \
                 forget_split=${forget_split} \
                 retain_split=${retain_split} \
-                +model.method_args.aggregation_strategy=${aggregation_strategy} \
-                +model.method_args.unlearn_trainer_cls=${unlearn_trainer_cls} \
+                trainer.method_args.aggregation_strategy=${aggregation_strategy} \
+                trainer.method_args.unlearn_trainer_cls=${unlearn_trainer_cls} \
                 model.model_args.pretrained_model_name_or_path=${model_path} \
                 retain_logs_path=saves/eval/tofu_${model}_${retain_split}/TOFU_EVAL.json \
                 trainer.args.per_device_train_batch_size=$per_device_train_batch_size \
