@@ -1,0 +1,29 @@
+handler: FederatedFinetuneTrainer
+method_args:
+  num_clients: 3  # Total number of clients in federated learning
+  aggregation_strategy: "FedAvg"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
+  global_rounds: 3  # 全局训练轮数设置
+
+args:
+  output_dir: saves/finetune/${task_name}
+  logging_dir: ${trainer.args.output_dir}/logs
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 16
+  gradient_accumulation_steps: 4
+  learning_rate: 1e-5
+  bf16: True
+  bf16_full_eval: True
+  logging_steps: 5
+  report_to: tensorboard
+  ddp_find_unused_parameters: None
+  gradient_checkpointing: False
+  optim: paged_adamw_32bit
+  save_strategy: 'no'
+  save_only_model: True
+  weight_decay: 0.00
+  do_train: True
+  do_eval: True
+  eval_on_start: True
+  eval_strategy: epoch
+  num_train_epochs: 10
+  seed: 0

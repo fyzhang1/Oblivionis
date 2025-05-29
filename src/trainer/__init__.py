@@ -11,6 +11,7 @@ from trainer.unlearn.dpo import DPO
 from trainer.unlearn.simnpo import SimNPO
 from trainer.unlearn.rmu import RMU
 from trainer.federated.federated_unlearning import FederatedUnlearningTrainer
+from .federated.fed_finetune import FederatedFinetuneTrainer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,7 @@ _register_trainer(Trainer)
 _register_trainer(FinetuneTrainer)
 
 _register_trainer(FederatedUnlearningTrainer)
+_register_trainer(FederatedFinetuneTrainer)
 
 # Register Unlearning Trainer
 _register_trainer(GradAscent)
