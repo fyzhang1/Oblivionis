@@ -11,13 +11,18 @@ We aim to construct the Federated LLM Unlearning: A unified framework for buildi
 - Multiple unlearning and federated unlearning algorithms
 ---------
 ### Quick Start
-##### Fine-Tune (Temporarily use centralized training to fine-tune a global model)
+##### Fine-Tune (centralized training)
 ```python
 python src/train.py --config-name=train.yaml experiment=finetune/tofu/default task_name=SAMPLE_TRAIN
 ```
 ```python
 The fine-tune model (initial global model) is saved: "saves/finetune/SAMPLE_TRAIN"
 ```
+##### Federated Fine-Tune 
+```python
+python src/fed_train.py --config-name=train.yaml \experiment=finetune/tofu/default \task_name=fed_TRAIN
+```
+
 ##### Unlearning: Federated Unlearning (GradAscent, Fedavg)
 ```python
 python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test \
