@@ -10,6 +10,7 @@ import numpy as np
 
 
 # python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test1
+# python src/fed_train.py --config-name=train.yaml \experiment=finetune/tofu/default \task_name=fed_TRAIN_3b \model=Llama-3.2-3B-Instruct
 
 """"
 fintune的eval
