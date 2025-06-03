@@ -1,16 +1,17 @@
 <div align="center">
-<h2><strong>Federated LLM Unlearning</strong></h2>
+<h2><strong>🌓 Federated LLM Unlearning</strong></h2>
 </div>
 
 ---------
-## Introduction
+## 🔥 Introduction
 We aim to construct the Federated LLM Unlearning: A unified framework for building secure federated large models that are trainable and forgettable on local private data.
 
 - Multiple federated learning algorithms
 - Multiple evaluation indicators
 - Multiple unlearning and federated unlearning algorithms
 ---------
-### Quick Start
+# 🏁 Quick Start
+##  🧩 TOFU Finetune
 ##### Fine-Tune (Temporarily use centralized training to fine-tune a global model)
 ```python
 python src/train.py --config-name=train.yaml experiment=finetune/tofu/default task_name=SAMPLE_TRAIN
@@ -24,6 +25,7 @@ The fine-tune model (initial global model) is saved: "saves/finetune/SAMPLE_TRAI
 python src/fed_train.py --config-name=train.yaml \experiment=finetune/tofu/default \task_name=fed_TRAIN_3b \model=Llama-3.2-3B-Instruct
 ```
 
+## 🪭 TOFU Unlearning
 ##### Unlearning: Federated Unlearning (GradAscent, Fedavg)
 ```python
 python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test \
@@ -52,6 +54,8 @@ The results are saved "saves/unlearn/test/evals"
 ```
 - retain_logs_path: the reference of initial global's evaluation
 
+
+## 🔑 MUSE Unlearning
 ##### MUSE: federated training (A100 80G)
 ```python
 python src/fed_train.py --config-name=unlearn.yaml \
@@ -66,7 +70,7 @@ trainer.args.gradient_accumulation_steps=8
 ```
 
 ---------
-## Acknowledgements
+## ⭐️ Acknowledgements
 
 - This repo is inspired from [OpenUnlearning](https://github.com/locuslab/open-unlearning). 
 
