@@ -16,7 +16,9 @@ wandb/
 data/
 !*/data/ 
 evals/
-!*/evals/  
+!*/evals/
+log.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

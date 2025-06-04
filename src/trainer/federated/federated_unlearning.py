@@ -166,9 +166,24 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         combined_dataset = CombinedDataset(forget_dataset, retain_dataset)
         logger.info(f"Unlearning_cls_name: {self.unlearn_trainer_cls}")
 
+        # 准备训练参数
+        training_args = self.args
+        if hasattr(training_args, 'deepspeed'):
+            # 如果存在deepspeed配置，创建一个新的TrainingArguments实例
+            training_args_dict = training_args.to_dict()
+            if 'deepspeed' in training_args_dict:
+                del training_args_dict['deepspeed']
+            # 禁用梯度累积，因为DeepSpeed已经处理了这个问题
+            training_args_dict['gradient_accumulation_steps'] = 1
+            from transformers import TrainingArguments
+            training_args = TrainingArguments(**training_args_dict)
+
         if self.aggregation_strategy == "FedProx":
             class FedProxUnlearnTrainer(trainer_cls):
                 def __init__(self, *args, global_model=None, mu=0.01, **kwargs):
+                    # 移除 deepspeed 相关配置
+                    if 'deepspeed' in kwargs:
+                        del kwargs['deepspeed']
                     super().__init__(*args, **kwargs)
                     self.global_model = global_model.to(self.args.device) if global_model is not None else None
                     self.mu = mu
@@ -194,7 +209,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 train_dataset=combined_dataset,
                 tokenizer=self.tokenizer,
                 data_collator=self.data_collator,
-                args=self.args,
+                args=training_args,
                 evaluator=self.evaluator,
                 template_args=self.template_args,
                 global_model=self.model.cpu(),  # 传递CPU上的全局模型
@@ -202,15 +217,20 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 **self.kwargs
             )
         else:
+            # 移除 deepspeed 相关配置
+            kwargs = self.kwargs.copy()
+            if 'deepspeed' in kwargs:
+                del kwargs['deepspeed']
+                
             unlearn_trainer = trainer_cls(
                 model=client_model,
                 train_dataset=combined_dataset,
                 tokenizer=self.tokenizer,
                 data_collator=self.data_collator,
-                args=self.args,
+                args=training_args,
                 evaluator=self.evaluator,
                 template_args=self.template_args,
-                **self.kwargs
+                **kwargs
             )
         
         # 训练器会自动将模型移到正确的设备上
