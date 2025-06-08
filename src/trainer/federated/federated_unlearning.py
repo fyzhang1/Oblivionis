@@ -145,25 +145,6 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         
         logger.info(f"forget_data length: {len(forget_dataset)}")
         logger.info(f"retain_data length: {len(retain_dataset)}")
-
-        class CombinedDataset(Dataset):
-            def __init__(self, forget_data, retain_data):
-                self.forget_data = forget_data
-                self.retain_data = retain_data
-                self.retain_length = len(retain_data)
-
-            def __len__(self):
-                return len(self.forget_data)
-
-            def __getitem__(self, idx):
-                # 对retain数据集进行循环索引
-                retain_idx = idx % self.retain_length
-                return {
-                    "forget": self.forget_data[idx],
-                    "retain": self.retain_data[retain_idx]
-                }
-        
-        combined_dataset = CombinedDataset(forget_dataset, retain_dataset)
         logger.info(f"Unlearning_cls_name: {self.unlearn_trainer_cls}")
 
         # 准备训练参数
@@ -206,7 +187,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             
             unlearn_trainer = FedProxUnlearnTrainer(
                 model=client_model,
-                train_dataset=combined_dataset,
+                train_dataset=forget_dataset,
                 tokenizer=self.tokenizer,
                 data_collator=self.data_collator,
                 args=training_args,
@@ -224,7 +205,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 
             unlearn_trainer = trainer_cls(
                 model=client_model,
-                train_dataset=combined_dataset,
+                train_dataset=forget_dataset,
                 tokenizer=self.tokenizer,
                 data_collator=self.data_collator,
                 args=training_args,

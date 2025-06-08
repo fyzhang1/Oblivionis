@@ -32,18 +32,17 @@ class ForgetRetainDataset(Dataset):
             raise NotImplementedError(f"{self.anchor} can be only forget or retain")
 
     def __getitem__(self, idx):
-        item = {}
+        """Returns the item from the anchor dataset.
+        
+        Returns:
+            dict: A dictionary containing the input_ids, attention_mask, and labels.
+        """
         if self.anchor == "forget":
-            item["forget"] = self.forget[idx]
-            if self.retain:
-                retain_idx = torch.randint(0, len(self.retain), (1,)).item()
-                item["retain"] = self.retain[retain_idx]
+            return self.forget[idx]
         elif self.anchor == "retain":
-            item["retain"] = self.retain[idx]
-            if self.forget:
-                forget_idx = torch.randint(0, len(self.forget), (1,)).item()
-                item["forget"] = self.forget[forget_idx]
-        return item
+            return self.retain[idx]
+        else:
+            raise NotImplementedError(f"{self.anchor} can be only forget or retain")
 
 def get_federated_data(forget_dataset, retain_dataset, num_clients, target_client_idx):
     """
@@ -56,26 +55,13 @@ def get_federated_data(forget_dataset, retain_dataset, num_clients, target_clien
         target_client_idx (int): Index of the client that will receive forget data
         
     Returns:
-        dict: Dictionary mapping client indices to their datasets
+        dict: Dictionary mapping client indices to their ForgetRetainDataset instances
     """
     if target_client_idx >= num_clients:
         raise ValueError(f"Target client index {target_client_idx} must be less than number of clients {num_clients}")
     
     # Create an empty dictionary to store client datasets
     client_datasets = {}
-    
-    # The target client receives the forget dataset (for unlearning)
-    # and a portion of the retain dataset
-    if forget_dataset is not None:
-        client_datasets[target_client_idx] = {
-            "forget": forget_dataset,
-            "retain": None  # Will be filled with a portion of retain_dataset
-        }
-    else:
-        client_datasets[target_client_idx] = {
-            "forget": None,
-            "retain": None  # Will be filled with a portion of retain_dataset
-        }
     
     # Split retain dataset among all clients
     if retain_dataset is not None:
@@ -98,14 +84,20 @@ def get_federated_data(forget_dataset, retain_dataset, num_clients, target_clien
             from torch.utils.data import Subset
             client_retain = Subset(retain_dataset, client_indices)
             
+            # Create ForgetRetainDataset for this client
             if client_idx == target_client_idx:
-                # Add retain data to target client
-                client_datasets[client_idx]["retain"] = client_retain
+                # Target client gets both forget and retain data
+                client_datasets[client_idx] = ForgetRetainDataset(
+                    forget=forget_dataset,
+                    retain=client_retain,
+                    anchor="forget"
+                )
             else:
-                # For non-target clients, they only have retain data
-                client_datasets[client_idx] = {
-                    "forget": None,
-                    "retain": client_retain
-                }
+                # Non-target clients only get retain data
+                client_datasets[client_idx] = ForgetRetainDataset(
+                    forget=None,
+                    retain=client_retain,
+                    anchor="retain"
+                )
     
     return client_datasets
