@@ -3,15 +3,18 @@ import logging
 from copy import deepcopy
 from typing import Dict, List, Any, Optional
 
-from trainer.base import FinetuneTrainer
+from trainer.base import BaseTrainer, FinetuneTrainer
 from trainer.unlearn.base import UnlearnTrainer
 from data.unlearn import ForgetRetainDataset
 from torch.utils.data import Dataset
 from trainer.federated.federated_utils import *
+from transformers import TrainingArguments
+from vllm import SamplingParams
+
 logger = logging.getLogger(__name__)
 
-class FederatedUnlearningTrainer(FinetuneTrainer):
-    """联邦学习与遗忘训练器, 继承自FinetuneTrainer"""
+class FederatedUnlearningTrainer(BaseTrainer):
+    """联邦学习与遗忘训练器"""
     
     def __init__(
         self,
@@ -35,7 +38,6 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         dummy_train_dataset = None
         if self.federated_dataset and 0 in self.federated_dataset:
             dummy_train_dataset = self.federated_dataset[0].retain
-            # dummy_train_dataset = self.federated_dataset[0].get("retain")
         
         super().__init__(
             model=model,
@@ -48,7 +50,6 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             template_args=template_args,
         )
         
-        # logger.info(f"Training args: {self.args}")
         self.num_clients = num_clients
         self.target_client_idx = target_client_idx
         self.unlearn_trainer_cls = unlearn_trainer_cls
@@ -56,7 +57,18 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         self.global_rounds = global_rounds
         self.client_models = []
         self.kwargs = kwargs
-
+        
+        self.is_vllm = not hasattr(self.model, 'forward')
+        
+        if not self.federated_dataset:
+            logger.warning("No federated dataset provided!")
+        else:
+            for client_idx in range(num_clients):
+                if client_idx not in self.federated_dataset:
+                    logger.warning(f"Client {client_idx} has no data!")
+        
+        logger.info(f"Initialized with {num_clients} clients, target: {target_client_idx}, global rounds: {global_rounds}")
+        
         self.server_momentum = None  # 用于FedAvgM、FedAdam、FedYogi
         self.server_velocity = None  # 用于FedAdagrad、FedAdam、FedYogi
         # self.server_control = None   # 用于SCAFFOLD
@@ -72,16 +84,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             'mu': kwargs.get('mu', 0.01),
             'momentum_factor': kwargs.get('momentum_factor', 0.9)
         }
-        
-        if not self.federated_dataset:
-            logger.warning("No federated dataset provided!")
-        else:
-            for client_idx in range(num_clients):
-                if client_idx not in self.federated_dataset:
-                    logger.warning(f"Client {client_idx} has no data!")
-        
-        logger.info(f"Initialized with {num_clients} clients, target: {target_client_idx}, global rounds: {global_rounds}")
-    
+
     def train(self, resume_from_checkpoint=None, trial=None, **kwargs):
         """执行联邦学习训练过程"""
         if not self.federated_dataset:
@@ -90,18 +93,36 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         logger.info(f"Starting federated unlearning training with {self.global_rounds} global rounds")
         
         # 将全局模型移到CPU，以节省GPU内存
-        self.model = self.model.cpu()
-        self.model = deepcopy(self.model)
+        if not self.is_vllm:
+            self.model = self.model.cpu()
+            self.model = deepcopy(self.model)
+
+        # 步骤1: 目标客户端执行unlearning
+            logger.info(f"Step 1: Unlearning on target client {self.target_client_idx}")
+            if self.target_client_idx in self.federated_dataset:
+                target_dataset = self.federated_dataset[self.target_client_idx]
+                # 使用当前全局模型进行unlearning
+                self._unlearn_client_model(deepcopy(self.model), target_dataset)
+                
+                # 步骤2: 将unlearning后的模型设为新的全局模型
+                # self.model = self.model
+                logger.info("Updated global model with unlearned model")
+            else:
+                logger.warning(f"Target client {self.target_client_idx} has no data, skipping unlearning")
         
         for round_idx in range(self.global_rounds):
             logger.info(f"Starting global round {round_idx + 1}/{self.global_rounds}")
             
-            # 在CPU上初始化客户端模型
-            self.client_models = [deepcopy(self.model) for _ in range(self.num_clients)]
+            # 步骤3: 所有客户端基于新全局模型在retain data上训练
+            logger.info("Step 2: All clients training on retain data with updated global model")
+            
+            # 在CPU上初始化客户端模型（基于unlearning后的全局模型）
+            if not self.is_vllm:
+                self.client_models = [deepcopy(self.model) for _ in range(self.num_clients)]
+            else:
+                self.client_models = [self.model for _ in range(self.num_clients)]
 
-            # 训练客户端模型
-            logger.info(f"Aggregation_strategy: {self.aggregation_strategy}")
-
+            # 所有客户端在retain data上训练
             for client_idx in range(self.num_clients):
                 if client_idx not in self.federated_dataset:
                     logger.warning(f"Skipping client {client_idx} as no data is available")
@@ -110,18 +131,15 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 client_model = self.client_models[client_idx]
                 client_dataset = self.federated_dataset[client_idx]
                 
-                # federated learning
-                if client_idx == self.target_client_idx:
-                    logger.info(f"Unlearning on client {client_idx}")
-                    self._unlearn_client_model(client_model, client_dataset)
-                else:
-                    logger.info(f"Training on client {client_idx}")
-                    self._train_client_model(client_model, client_dataset)
+                logger.info(f"Training client {client_idx} on retain data")
+                self._train_client_model(client_model, client_dataset)
                 
                 # 训练完成后将模型移回CPU
-                self.client_models[client_idx] = client_model.cpu()
+                if not self.is_vllm:
+                    self.client_models[client_idx] = client_model.cpu()
             
-            # 聚合模型 - 结果已经直接更新到self.model
+            # 步骤4: 聚合所有客户端模型
+            logger.info("Step 3: Aggregating all client models")
             self._aggregate_models()
             logger.info(f"Completed global round {round_idx + 1}/{self.global_rounds}")
             
@@ -129,12 +147,75 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             if self.args.save_strategy == "epoch" or (round_idx == self.global_rounds - 1):
                 save_path = f"{self.args.output_dir}/round_{round_idx + 1}"
                 # 确保模型在CPU上保存
-                self.model = self.model.cpu()
+                if not self.is_vllm:
+                    self.model = self.model.cpu()
                 self.save_model(save_path)
                 logger.info(f"Model saved at {save_path}")
         
         self.save_state()
         return None
+    
+    # def train(self, resume_from_checkpoint=None, trial=None, **kwargs):
+    #     """执行联邦学习训练过程"""
+    #     if not self.federated_dataset:
+    #         raise ValueError("Federated dataset is not properly set up")
+        
+    #     logger.info(f"Starting federated unlearning training with {self.global_rounds} global rounds")
+        
+    #     # 将全局模型移到CPU，以节省GPU内存
+    #     if not self.is_vllm:
+    #         self.model = self.model.cpu()
+    #         self.model = deepcopy(self.model)
+        
+    #     for round_idx in range(self.global_rounds):
+    #         logger.info(f"Starting global round {round_idx + 1}/{self.global_rounds}")
+            
+    #         # 在CPU上初始化客户端模型
+    #         if not self.is_vllm:
+    #             self.client_models = [deepcopy(self.model) for _ in range(self.num_clients)]
+    #         else:
+    #             # 对于vLLM模型，我们只保存状态字典
+    #             self.client_models = [self.model for _ in range(self.num_clients)]
+
+    #         # 训练客户端模型
+    #         logger.info(f"Aggregation_strategy: {self.aggregation_strategy}")
+
+    #         for client_idx in range(self.num_clients):
+    #             if client_idx not in self.federated_dataset:
+    #                 logger.warning(f"Skipping client {client_idx} as no data is available")
+    #                 continue
+                    
+    #             client_model = self.client_models[client_idx]
+    #             client_dataset = self.federated_dataset[client_idx]
+                
+    #             # federated learning
+    #             if client_idx == self.target_client_idx:
+    #                 logger.info(f"Unlearning on client {client_idx}")
+    #                 self._unlearn_client_model(client_model, client_dataset)
+    #             else:
+    #                 logger.info(f"Training on client {client_idx}")
+    #                 self._train_client_model(client_model, client_dataset)
+
+                
+    #             # 训练完成后将模型移回CPU
+    #             if not self.is_vllm:
+    #                 self.client_models[client_idx] = client_model.cpu()
+            
+    #         # 聚合模型 - 结果已经直接更新到self.model
+    #         self._aggregate_models()
+    #         logger.info(f"Completed global round {round_idx + 1}/{self.global_rounds}")
+            
+    #         # 保存状态
+    #         if self.args.save_strategy == "epoch" or (round_idx == self.global_rounds - 1):
+    #             save_path = f"{self.args.output_dir}/round_{round_idx + 1}"
+    #             # 确保模型在CPU上保存
+    #             if not self.is_vllm:
+    #                 self.model = self.model.cpu()
+    #             self.save_model(save_path)
+    #             logger.info(f"Model saved at {save_path}")
+        
+    #     self.save_state()
+    #     return None
 
     def _unlearn_client_model(self, client_model, client_dataset):
         from trainer import TRAINER_REGISTRY
@@ -332,3 +413,36 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             
         self.model.load_state_dict(global_state_dict)
         logger.info("Global model updated")
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """Override compute_loss to handle vLLM models."""
+        if not self.is_vllm:
+            return super().compute_loss(model, inputs, return_outputs)
+            
+        # For vLLM models, we need to implement custom loss computation
+        # This is a placeholder implementation - you'll need to modify this
+        # based on your specific requirements
+        if isinstance(inputs, dict):
+            input_ids = inputs.get("input_ids")
+            labels = inputs.get("labels")
+            
+            if input_ids is not None and labels is not None:
+                # Create sampling parameters
+                sampling_params = SamplingParams(
+                    temperature=0.0,  # Use 0 temperature for deterministic output
+                    max_tokens=labels.shape[1],
+                    stop=None
+                )
+                
+                # Generate outputs using vLLM
+                outputs = model.generate(input_ids, sampling_params)
+                
+                # Compute loss (this is a placeholder - implement your actual loss computation)
+                # You might need to convert the outputs to the format expected by your loss function
+                loss = torch.tensor(0.0, device=input_ids.device)  # Placeholder
+                
+                if return_outputs:
+                    return loss, outputs
+                return loss
+                
+        raise NotImplementedError("Loss computation for vLLM models needs to be implemented for your specific use case")

@@ -1,0 +1,23 @@
+model_args:
+  use_vllm: true
+  pretrained_model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
+  tensor_parallel_size: 1  # 根据您的GPU数量调整
+  gpu_memory_utilization: 0.9
+  trust_remote_code: true
+  # vLLM特有的参数
+  max_model_len: 4096
+  quantization: null  # 可选: "awq", "squeezellm", "gptq"
+  enforce_eager: false
+  max_num_batched_tokens: 4096
+  max_num_seqs: 256
+tokenizer_args:
+  pretrained_model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
+template_args:
+  apply_chat_template: True
+  system_prompt: You are a helpful assistant.
+  system_prompt_with_special_tokens: "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou are a helpful assistant.<|eot_id|>"
+  user_start_tag: "<|start_header_id|>user<|end_header_id|>\n\n"
+  user_end_tag: "<|eot_id|>"
+  asst_start_tag: "<|start_header_id|>assistant<|end_header_id|>\n\n"
+  asst_end_tag: "<|eot_id|>"
+  date_string: 10 Apr 2025
