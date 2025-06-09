@@ -1,77 +1,71 @@
-<div align="center">
-<h2><strong>🌓 Federated LLM Unlearning</strong></h2>
-</div>
+## 配置文件
 
----------
-## 🔥 Introduction
-We aim to construct the Federated LLM Unlearning: A unified framework for building secure federated large models that are trainable and forgettable on local private data.
+### 1. 模型配置
 
-- Multiple federated learning algorithms
-- Multiple evaluation indicators
-- Multiple unlearning and federated unlearning algorithms
----------
-# 🏁 Quick Start
-##  🧩 TOFU Finetune
-##### Fine-Tune (Temporarily use centralized training to fine-tune a global model)
-```python
-python src/train.py --config-name=train.yaml experiment=finetune/tofu/default task_name=SAMPLE_TRAIN
-```
-```python
-The fine-tune model (initial global model) is saved: "saves/finetune/SAMPLE_TRAIN"
+创建或使用`configs/model/Llama-3.2-3B-Instruct-lora.yaml`:
+
+```yaml
+model_args:
+  pretrained_model_name_or_path: "meta-llama/Llama-3.2-3B-Instruct"
+  attn_implementation: 'flash_attention_2'
+  torch_dtype: bfloat16
+  use_lora: true
+  lora_config:
+    r: 16                    # LoRA rank
+    lora_alpha: 32          # LoRA alpha参数
+    target_modules: ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    lora_dropout: 0.1       # LoRA dropout率
+    bias: "none"            # bias处理方式
 ```
 
-##### Federated Fine-Tune
-```python
-python src/fed_train.py --config-name=train.yaml \experiment=finetune/tofu/default \task_name=fed_TRAIN_3b \model=Llama-3.2-3B-Instruct
+### 2. 训练配置
+
+使用`configs/unlearn-lora.yaml`:
+
+```yaml
+defaults:
+  - model: Llama-3.2-3B-Instruct-lora
+  - trainer: FederatedUnlearningTrainer
+  - data: unlearn
+  - collator: DataCollatorForSupervisedDataset
+  - eval: tofu
+  - hydra: default
+  - paths: default
+  - experiment: null
+  - _self_
+
+trainer:
+  args: 
+    remove_unused_columns: False
+
+mode: unlearn
+task_name: ???
 ```
 
-## 🪭 TOFU Unlearning
-##### Unlearning: Federated Unlearning (GradAscent, Fedavg)
-```python
-python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test \
-model=Llama-3.2-3B-Instruct \
-model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
-```
-```python
-The global model is saved "saves/unlearn/test" #test is the task_name
-```
-- config file: "configs/trainer/FederatedUnlearningTrainer"
+## 使用方法
 
-##### Eval: Using TOFU benchmark to evaluate global model
-```python
-CUDA_VISIBLE_DEVICES=0 python src/eval.py \
-experiment=eval/tofu/default.yaml \
-forget_split=forget10 \
-holdout_split=retain90 \
-task_name=test \
-model.model_args.pretrained_model_name_or_path=saves/unlearn/test \
-paths.output_dir=saves/unlearn/test/evals \
-retain_logs_path=saves/eval/SAMPLE_TRAIN/TOFU_EVAL.json
+### 1. 基本使用
+
+```bash
+python src/fed_train.py \
+  --config-name=unlearn-lora.yaml \
+  experiment=unlearn/tofu/default \
+  forget_split=forget10 \
+  retain_split=retain90 \
+  trainer=FederatedUnlearningTrainer \
+  task_name=fed_lora_unlearn \
+  model=Llama-3.2-3B-Instruct-lora \
+  model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
 ```
 
-```python
-The results are saved "saves/unlearn/test/evals" 
+### 2. 使用示例脚本
+
+```bash
+python scripts/run_federated_lora_unlearn.py \
+  --config-name=unlearn-lora.yaml \
+  experiment=unlearn/tofu/default \
+  forget_split=forget10 \
+  retain_split=retain90 \
+  task_name=fed_lora_unlearn \
+  model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
 ```
-- retain_logs_path: the reference of initial global's evaluation
-
-
-## 🔑 MUSE Unlearning
-##### MUSE: federated training (A100 80G)
-```python
-python src/fed_train.py --config-name=unlearn.yaml \
-experiment=unlearn/muse/default.yaml \
-model=Llama-2-7b-hf \
-data_split=News \
-trainer=FederatedUnlearningTrainer \
-task_name=test \
-retain_logs_path=saves/eval/muse_Llama-2-7b-hf_News_retrain/MUSE_EVAL.json \
-trainer.args.per_device_train_batch_size=2 \
-trainer.args.gradient_accumulation_steps=8
-```
-
----------
-## ⭐️ Acknowledgements
-
-- This repo is inspired from [OpenUnlearning](https://github.com/locuslab/open-unlearning). 
-
----------------------------
