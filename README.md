@@ -57,15 +57,3 @@ python src/fed_train.py \
   model=Llama-3.2-3B-Instruct-lora \
   model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
 ```
-
-### 2. 使用示例脚本
-
-```bash
-python scripts/run_federated_lora_unlearn.py \
-  --config-name=unlearn-lora.yaml \
-  experiment=unlearn/tofu/default \
-  forget_split=forget10 \
-  retain_split=retain90 \
-  task_name=fed_lora_unlearn \
-  model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
-```

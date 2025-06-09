@@ -40,21 +40,30 @@ def main(cfg: DictConfig):
     logger.info("=" * 60)
     logger.info("联邦学习LoRA遗忘训练")
     logger.info("=" * 60)
-    logger.info(f"模型: {cfg.model._target_ if hasattr(cfg.model, '_target_') else 'Llama-3.2-3B-Instruct-lora'}")
-    logger.info(f"任务名称: {cfg.task_name}")
-    logger.info(f"客户端数量: {cfg.trainer.method_args.get('num_clients', 3)}")
-    logger.info(f"目标客户端: {cfg.trainer.method_args.get('target_client_idx', 0)}")
-    logger.info(f"全局轮数: {cfg.trainer.method_args.get('global_rounds', 1)}")
-    logger.info(f"聚合策略: {cfg.trainer.method_args.get('aggregation_strategy', 'FedAvg')}")
+    logger.info(f"模型: {cfg.get('model', {}).get('_target_', 'Llama-3.2-3B-Instruct-lora')}")
+    logger.info(f"任务名称: {cfg.get('task_name', 'Unknown')}")
+    
+    # 安全地访问trainer配置
+    trainer_cfg = cfg.get('trainer', {})
+    method_args = trainer_cfg.get('method_args', {})
+    
+    logger.info(f"客户端数量: {method_args.get('num_clients', 3)}")
+    logger.info(f"目标客户端: {method_args.get('target_client_idx', 0)}")
+    logger.info(f"全局轮数: {method_args.get('global_rounds', 1)}")
+    logger.info(f"聚合策略: {method_args.get('aggregation_strategy', 'FedAvg')}")
     
     # LoRA特定配置
-    if hasattr(cfg.model, 'model_args') and cfg.model.model_args.get('use_lora', False):
-        lora_config = cfg.model.model_args.get('lora_config', {})
+    model_cfg = cfg.get('model', {})
+    model_args = model_cfg.get('model_args', {})
+    if model_args.get('use_lora', False):
+        lora_config = model_args.get('lora_config', {})
         logger.info("LoRA配置:")
         logger.info(f"  - rank (r): {lora_config.get('r', 16)}")
         logger.info(f"  - alpha: {lora_config.get('lora_alpha', 32)}")
         logger.info(f"  - dropout: {lora_config.get('lora_dropout', 0.1)}")
         logger.info(f"  - target_modules: {lora_config.get('target_modules', [])}")
+    else:
+        logger.info("未启用LoRA配置")
     
     logger.info("=" * 60)
     
