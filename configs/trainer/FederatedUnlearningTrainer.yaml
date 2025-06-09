@@ -27,7 +27,7 @@ args:
   do_eval: false
   eval_on_start: false
   eval_strategy: 'no'
-  num_train_epochs: 1
+  num_train_epochs: 10
   seed: 0
   # output_dir: "/home/ecs-user/FedLLMUnlearning/model"
   # learning_rate: 0.01

@@ -15,3 +15,4 @@ scipy==1.15.3
 tensorboard==2.19.0
 vllm==0.7.0
 sglang==0.4.6.post4
+peft==0.13.2

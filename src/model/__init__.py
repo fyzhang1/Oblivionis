@@ -5,6 +5,7 @@ import torch
 import logging
 from typing import Union, Tuple
 from vllm import LLM, SamplingParams
+from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 
 hf_home = os.getenv("HF_HOME", default=None)
 
@@ -79,6 +80,12 @@ def get_vllm_model(model_args: DictConfig, tokenizer_args: DictConfig) -> Tuple[
 def get_transformers_model(model_args: DictConfig, tokenizer_args: DictConfig) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
     """Load model using Transformers backend."""
     torch_dtype = get_dtype(model_args)
+    
+    # Check if we need to load a PEFT model
+    use_lora = model_args.get("use_lora", False)
+    lora_config = model_args.get("lora_config", None)
+    lora_model_path = model_args.get("lora_model_path", None)
+    
     try:
         # Convert DictConfig to dict for transformers
         transformers_args = {
@@ -87,7 +94,42 @@ def get_transformers_model(model_args: DictConfig, tokenizer_args: DictConfig) -
             "trust_remote_code": model_args.get("trust_remote_code", True),
             "cache_dir": hf_home
         }
-        model = AutoModelForCausalLM.from_pretrained(**transformers_args)
+        
+        if lora_model_path:
+            # Load existing PEFT model
+            logger.info(f"Loading existing PEFT model from {lora_model_path}")
+            model = PeftModel.from_pretrained(
+                AutoModelForCausalLM.from_pretrained(**transformers_args),
+                lora_model_path
+            )
+        elif use_lora:
+            # Create new LoRA model
+            logger.info("Creating new LoRA model")
+            base_model = AutoModelForCausalLM.from_pretrained(**transformers_args)
+            
+            # Default LoRA configuration
+            default_lora_config = {
+                "r": 16,
+                "lora_alpha": 32,
+                "target_modules": ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+                "lora_dropout": 0.1,
+                "bias": "none",
+                "task_type": TaskType.CAUSAL_LM,
+            }
+            
+            # Update with user config if provided
+            if lora_config:
+                default_lora_config.update(lora_config)
+            
+            peft_config = LoraConfig(**default_lora_config)
+            model = get_peft_model(base_model, peft_config)
+            
+            # Print trainable parameters info
+            model.print_trainable_parameters()
+        else:
+            # Load standard model without LoRA
+            model = AutoModelForCausalLM.from_pretrained(**transformers_args)
+            
     except Exception as e:
         logger.warning(
             f"Model {model_args.pretrained_model_name_or_path} requested with {model_args}"
