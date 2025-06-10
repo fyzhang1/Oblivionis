@@ -57,3 +57,11 @@ python src/fed_train.py \
   model=Llama-3.2-3B-Instruct-lora \
   model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
 ```
+
+```bash
+python src/fed_train.py \
+  --config-name=train-lora.yaml \
+  experiment=finetune/tofu/default \
+  task_name=fed_lora_fine_tune \
+  model=Llama-3.2-3B-Instruct-lora
+```
