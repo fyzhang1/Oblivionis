@@ -49,6 +49,7 @@ model_args:
 
 ### 2. 训练配置
 
+#### 联邦遗忘训练
 使用`configs/unlearn-lora.yaml`:
 
 ```yaml
@@ -71,9 +72,33 @@ mode: unlearn
 task_name: ???
 ```
 
+#### 联邦微调训练
+使用`configs/train-lora.yaml`:
+
+```yaml
+defaults:
+  - model: Llama-3.2-3B-Instruct-lora
+  - trainer: FederatedFinetune
+  - data: train
+  - collator: DataCollatorForSupervisedDataset
+  - hydra: default
+  - paths: default
+  - experiment: null
+  - _self_
+
+trainer:
+  args: 
+    remove_unused_columns: False
+
+mode: train
+task_name: ???
+```
+
 ## 使用方法
 
-### 1. 基本使用
+### 1. 联邦遗忘训练
+
+#### 基本使用
 
 ```bash
 python src/fed_train.py \
@@ -87,7 +112,7 @@ python src/fed_train.py \
   model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
 ```
 
-### 2. 使用示例脚本
+#### 使用示例脚本
 
 ```bash
 python scripts/run_federated_lora_unlearn.py \
@@ -97,6 +122,34 @@ python scripts/run_federated_lora_unlearn.py \
   retain_split=retain90 \
   task_name=fed_lora_unlearn \
   model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
+```
+
+### 2. 联邦微调训练
+
+#### 基本使用
+
+```bash
+python src/fed_train.py \
+  --config-name=train-lora.yaml \
+  experiment=finetune/tofu/default \
+  task_name=fed_lora_finetune \
+  model=Llama-3.2-3B-Instruct-lora \
+  trainer.method_args.num_clients=3 \
+  trainer.method_args.global_rounds=5 \
+  trainer.method_args.aggregation_strategy=FedAvg
+```
+
+#### 使用示例脚本
+
+```bash
+python scripts/run_federated_lora_finetune.py \
+  --config-name=train-lora.yaml \
+  experiment=finetune/tofu/default \
+  task_name=fed_lora_finetune \
+  model=Llama-3.2-3B-Instruct-lora \
+  trainer.method_args.num_clients=3 \
+  trainer.method_args.global_rounds=5 \
+  trainer.method_args.aggregation_strategy=FedAvg
 ```
 
 ### 3. 加载已有的LoRA模型
@@ -171,12 +224,53 @@ lora_config:
 
 项目支持多种联邦聚合策略与LoRA结合：
 
+#### 联邦遗忘训练支持的策略：
 - **FedAvg**: 标准联邦平均
 - **FedAvgM**: 带动量的联邦平均
 - **FedAdagrad**: 自适应学习率
 - **FedAdam**: Adam优化器的联邦版本
 - **FedYogi**: Yogi优化器的联邦版本
 - **FedProx**: 近端联邦优化
+
+#### 联邦微调训练支持的策略：
+- **FedAvg**: 标准联邦平均
+- **FedAvgM**: 带动量的联邦平均
+- **FedAdagrad**: 自适应学习率
+- **FedAdam**: Adam优化器的联邦版本
+- **FedYogi**: Yogi优化器的联邦版本
+- **FedProx**: 近端联邦优化
+
+## 模型评估
+
+### 使用LoRA adapter进行评估
+
+#### 方法1：使用lora_model_path参数（推荐）
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python src/eval.py \
+experiment=eval/tofu/default.yaml \
+forget_split=forget10 \
+holdout_split=retain90 \
+task_name=test \
+model=Llama-3.2-3B-Instruct \
+model.model_args.lora_model_path=saves/unlearn/test \
+paths.output_dir=saves/unlearn/test/evals \
+retain_logs_path=saves/eval/SAMPLE_TRAIN/TOFU_EVAL.json
+```
+
+#### 方法2：创建专门的LoRA eval配置
+
+创建 `configs/model/Llama-3.2-3B-Instruct-lora-eval.yaml`：
+```yaml
+model_args:
+  pretrained_model_name_or_path: "meta-llama/Llama-3.2-3B-Instruct"  # 基础模型
+  lora_model_path: null  # 将在命令行中指定
+  attn_implementation: 'flash_attention_2'
+  torch_dtype: bfloat16
+tokenizer_args:
+  pretrained_model_name_or_path: "meta-llama/Llama-3.2-3B-Instruct"
+# ... 其他配置
+```
 
 ## 故障排除
 
@@ -213,6 +307,38 @@ lora_config:
      args:
        gradient_checkpointing: true
        dataloader_num_workers: 4
+   ```
+
+## 工作流程示例
+
+### 完整的联邦学习LoRA工作流程
+
+1. **联邦微调阶段**:
+   ```bash
+   # 使用LoRA进行联邦微调
+   python src/fed_train.py \
+     --config-name=train-lora.yaml \
+     experiment=finetune/tofu/default \
+     task_name=fed_lora_finetune
+   ```
+
+2. **联邦遗忘阶段**:
+   ```bash
+   # 基于微调结果进行联邦遗忘
+   python src/fed_train.py \
+     --config-name=unlearn-lora.yaml \
+     experiment=unlearn/tofu/default \
+     task_name=fed_lora_unlearn \
+     model.model_args.lora_model_path=saves/finetune/fed_lora_finetune
+   ```
+
+3. **模型评估**:
+   ```bash
+   # 评估遗忘效果
+   python src/eval.py \
+     experiment=eval/tofu/default.yaml \
+     task_name=fed_lora_eval \
+     model.model_args.lora_model_path=saves/unlearn/fed_lora_unlearn
    ```
 
 ## 实验建议

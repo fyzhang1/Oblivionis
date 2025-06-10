@@ -75,8 +75,6 @@ class FederatedUnlearningTrainer(BaseTrainer):
         
         self.server_momentum = None  # 用于FedAvgM、FedAdam、FedYogi
         self.server_velocity = None  # 用于FedAdagrad、FedAdam、FedYogi
-        # self.server_control = None   # 用于SCAFFOLD
-        # self.client_controls = None  # 用于SCAFFOLD
         
         # 为算法特定参数设置默认值
         self.fed_args = {

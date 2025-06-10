@@ -6,6 +6,9 @@ from typing import Dict, List, Any, Optional
 from trainer.base import FinetuneTrainer
 from torch.utils.data import Dataset
 from trainer.federated.federated_utils import *
+from peft import PeftModel
+import os
+
 logger = logging.getLogger(__name__)
 
 class FederatedFinetuneTrainer(FinetuneTrainer):
@@ -48,6 +51,9 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         self.global_rounds = global_rounds
         self.client_models = []
         self.kwargs = kwargs
+        
+        # 检测是否为PEFT模型
+        self.is_peft = isinstance(self.model, PeftModel)
 
         self.server_momentum = None  # 用于FedAvgM、FedAdam、FedYogi
         self.server_velocity = None  # 用于FedAdagrad、FedAdam、FedYogi
@@ -71,6 +77,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                     logger.warning(f"Client {client_idx} has no data!")
         
         logger.info(f"Initialized with {num_clients} clients, global rounds: {global_rounds}")
+        logger.info(f"Model type - PEFT: {self.is_peft}")
     
     def train(self, resume_from_checkpoint=None, trial=None, **kwargs):
         """执行联邦学习训练过程"""
@@ -169,26 +176,43 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
     def _aggregate_models(self):
         """聚合所有客户端模型"""
         logger.info("Aggregating client models")
-        # 确保所有模型都在CPU上进行聚合
-        client_state_dicts = [model.cpu().state_dict() for model in self.client_models]
+        
+        if self.is_peft:
+            # 对于PEFT模型，只聚合可训练的参数（LoRA权重）
+            client_state_dicts = []
+            for model in self.client_models:
+                model = model.cpu()
+                # 只获取PEFT适配器的状态字典
+                peft_state_dict = model.get_peft_state_dict()
+                client_state_dicts.append(peft_state_dict)
+        else:
+            # 对于普通模型，聚合所有参数
+            client_state_dicts = [model.cpu().state_dict() for model in self.client_models]
+        
         logger.info(f"Aggregation strategy: {self.aggregation_strategy}")
+        
+        if self.is_peft:
+            # 获取当前全局模型的PEFT状态字典
+            global_peft_state_dict = self.model.cpu().get_peft_state_dict()
+        else:
+            global_peft_state_dict = self.model.cpu().state_dict()
         
         if self.aggregation_strategy == "FedAvg":
             global_state_dict = FedAvg(
                 client_state_dicts, 
-                global_model_state_dict=self.model.cpu().state_dict()
+                global_model_state_dict=global_peft_state_dict
             )
         elif self.aggregation_strategy == "FedAvgM":
             global_state_dict, self.server_momentum = FedAvgM(
                 client_state_dicts,
-                global_model_state_dict=self.model.cpu().state_dict(),
+                global_model_state_dict=global_peft_state_dict,
                 server_momentum=self.server_momentum,
                 momentum_factor=self.fed_args['momentum_factor']
             )
         elif self.aggregation_strategy == "FedAdagrad":
             global_state_dict, self.server_velocity = FedAdagrad(
                 client_state_dicts,
-                global_model_state_dict=self.model.cpu().state_dict(),
+                global_model_state_dict=global_peft_state_dict,
                 server_velocity=self.server_velocity,
                 learning_rate=self.fed_args['server_lr'],
                 epsilon=self.fed_args['epsilon'],
@@ -197,7 +221,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         elif self.aggregation_strategy == "FedYogi":
             global_state_dict, self.server_velocity, self.server_momentum = FedYogi(
                 client_state_dicts,
-                global_model_state_dict=self.model.cpu().state_dict(),
+                global_model_state_dict=global_peft_state_dict,
                 server_velocity=self.server_velocity,
                 server_momentum=self.server_momentum,
                 learning_rate=self.fed_args['server_lr'],
@@ -209,7 +233,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         elif self.aggregation_strategy == "FedAdam":
             global_state_dict, self.server_velocity, self.server_momentum = FedAdam(
                 client_state_dicts,
-                global_model_state_dict=self.model.cpu().state_dict(),
+                global_model_state_dict=global_peft_state_dict,
                 server_velocity=self.server_velocity,
                 server_momentum=self.server_momentum,
                 learning_rate=self.fed_args['server_lr'],
@@ -221,9 +245,33 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         elif self.aggregation_strategy == "FedProx":
             global_state_dict = FedProx(
                 client_state_dicts,
-                global_model_state_dict=self.model.cpu().state_dict(),
+                global_model_state_dict=global_peft_state_dict,
                 mu=self.fed_args['mu']
             )
+        
+        if self.is_peft:
+            # 对于PEFT模型，只加载PEFT适配器的权重
+            self.model.load_peft_state_dict(global_state_dict)
+        else:
+            # 对于普通模型，加载所有权重
+            self.model.load_state_dict(global_state_dict)
             
-        self.model.load_state_dict(global_state_dict)
         logger.info("Global model updated")
+
+    def save_model(self, output_dir=None, state_dict=None):
+        """保存模型，支持PEFT模型"""
+        if output_dir is None:
+            output_dir = self.args.output_dir
+
+        os.makedirs(output_dir, exist_ok=True)
+        
+        if self.is_peft:
+            # 保存PEFT模型
+            logger.info(f"Saving PEFT model to {output_dir}")
+            self.model.save_pretrained(output_dir)
+            # 同时保存tokenizer
+            if self.tokenizer is not None:
+                self.tokenizer.save_pretrained(output_dir)
+        else:
+            # 保存普通模型
+            super().save_model(output_dir, state_dict)
