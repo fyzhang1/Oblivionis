@@ -15,7 +15,7 @@ from data.unlearn import ForgetRetainDataset
 #         return (loss, outputs) if return_outputs else loss
 
 class GradAscent(UnlearnTrainer):
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         """
         Compute loss for gradient ascent (unlearning).
         Expects inputs to be a dict with 'input_ids', 'labels', 'attention_mask'.

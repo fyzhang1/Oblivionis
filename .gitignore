@@ -1,52 +1,48 @@
-# custom .gitignore
-submit.py
-!src/data/__init__.py
-logs/
-unity/
-src/data/test.py
-src/data/__pycache__
-ms_cache/
-logs/
-hf_cache/
-cache*/
-saves*/
-notebooks/
-output*/
-wandb/
-data/
-!*/data/ 
-evals/
-!*/evals/
-log.txt
+# Update: Xinyu Yan, 2025-06-25
+# TL;DR: This file is used to ignore the files that are not needed to be tracked by git
 
-# Byte-compiled / optimized / DLL files
+# Customized .gitignore
+log*/
+unity*/
+cache*/
+data*/
+eval*/
+hf_cache*/
+notebook*/
+output*/
+saves*/
+wandb*/
+memory_log.txt
+
+# Byte-Compiled / Optimized / DLL Files
 __pycache__/
-*.py[cod]
 *$py.class
-eval_logs/
+*.py[cod]
 eval_dumps/
-# C extensions
+eval_logs/
+
+# C Extensions
 *.so
 
-# Distribution / packaging
+# Distribution / Packaging
 .Python
+.installed.cfg
+.eggs/
+.egg-info/
 build/
 develop-eggs/
 dist/
 downloads/
 eggs/
-.eggs/
 lib/
 lib64/
+MANIFEST
 parts/
 sdist/
+share/python-wheels/
 var/
 wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
 *.egg
-MANIFEST
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -54,44 +50,44 @@ MANIFEST
 *.manifest
 *.spec
 
-# Installer logs
-pip-log.txt
+# Installer Logs
 pip-delete-this-directory.txt
+pip-log.txt
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
+# Unit Test / Coverage Reports
 .coverage
 .coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
 .hypothesis/
+.nox/
 .pytest_cache/
 .ruff_cache/
+.tox/
+.cache
 cover/
+coverage.xml
+htmlcov/
+nosetests.xml
+*.cover
+*.py,cover
 
 # Translations
 *.mo
 *.pot
 
-# Django stuff:
+# Django Stuff:
 *.log
-local_settings.py
 db.sqlite3
 db.sqlite3-journal
+local_settings.py
 
-# Flask stuff:
+# Flask Stuff:
 instance/
 .webassets-cache
 
-# Scrapy stuff:
+# Scrapy Stuff:
 .scrapy
 
-# Sphinx documentation
+# Sphinx Documentation
 docs/_build/
 
 # PyBuilder
@@ -102,8 +98,8 @@ target/
 .ipynb_checkpoints
 
 # IPython
-profile_default/
 ipython_config.py
+profile_default/
 
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
@@ -135,44 +131,44 @@ ipython_config.py
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
 
-# Celery stuff
+# Celery Stuff
 celerybeat-schedule
 celerybeat.pid
 
-# SageMath parsed files
+# SageMath Parsed Files
 *.sage.py
 
 # Environments
 .env
 .venv
-env/
-venv/
 ENV/
+env/
 env.bak/
+venv/
 venv.bak/
 
-# Spyder project settings
+# Spyder Project Settings
 .spyderproject
 .spyproject
 
-# Rope project settings
+# Rope Project Settings
 .ropeproject
 
-# mkdocs documentation
+# Mkdocs Documentation
 /site
 
-# mypy
-.mypy_cache/
+# Mypy
 .dmypy.json
+.mypy_cache/
 dmypy.json
 
-# Pyre type checker
+# Pyre Type Checker
 .pyre/
 
-# pytype static type analyzer
+# Pytype Static Type Analyzer
 .pytype/
 
-# Cython debug symbols
+# Cython Debug Symbols
 cython_debug/
 
 # PyCharm
@@ -182,4 +178,5 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
+# Visual Studio Code
 .vscode/
