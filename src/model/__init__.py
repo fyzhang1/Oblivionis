@@ -40,7 +40,7 @@ def get_model(model_cfg: DictConfig):
     tokenizer_args = model_cfg.tokenizer_args
     torch_dtype = get_dtype(model_args)
 
-    # LoRA
+    # Check if we need to load a PEFT model
     use_lora = model_args.get("use_lora", False)
     lora_config = model_args.get("lora_config", None)
     lora_model_path = model_args.get("lora_model_path", None)
@@ -48,6 +48,8 @@ def get_model(model_cfg: DictConfig):
     try:
         # Convert DictConfig to dict for transformersAdd commentMore actions
         transformers_args = {
+            "torch_dtype": torch_dtype,
+            "pretrained_model_name_or_path": model_args.pretrained_model_name_or_path,
             "trust_remote_code": model_args.get("trust_remote_code", True),
             "cache_dir": hf_home
         }
