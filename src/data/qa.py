@@ -58,6 +58,7 @@ class QADataset(Dataset):
         return item_dct
 
     def __getitem__(self, idx):
+        idx = int(idx)  # 确保索引是Python int类型
         question = self.data[idx][self.question_key]
         answer = self.data[idx][self.answer_key]
         index = self.data[idx]["index"]

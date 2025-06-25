@@ -9,46 +9,6 @@ from torch.utils.data import Subset
 import numpy as np
 
 
-# python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test1
-# python src/fed_train.py --config-name=train.yaml \experiment=finetune/tofu/default \task_name=fed_TRAIN_3b \model=Llama-3.2-3B-Instruct
-
-""""
-fintune的eval
-        CUDA_VISIBLE_DEVICES=0 python src/eval.py experiment=eval/tofu/default.yaml \
-        forget_split=forget10 \
-        holdout_split=retain90\
-        task_name=SAMPLE_TRAIN \
-        model=${model} \
-        model.model_args.pretrained_model_name_or_path=saves/finetune/tofu_${model}_full \
-        retain_logs_path=saves/eval/tofu_${model}_${retain_split}/TOFU_EVAL.json \
-        paths.output_dir=saves/eval/tofu_${model}_full/evals_${forget_split}
-"""
-
-"""
-微调
-python src/train.py --config-name=train.yaml experiment=finetune/tofu/default task_name=SAMPLE_TRAIN
-
-python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test1
-
-DPO:unlearn/tofu/idk.yaml
-python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/idk \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=test1
-
-
-# python src/eval.py  experiment=eval/tofu/default.yaml task_name=test
-
-python src/fed_train.py --config-name=unlearn.yaml experiment=unlearn/tofu/default \forget_split=forget10 retain_split=retain90 trainer=FederatedUnlearningTrainer task_name=Fed_Grad_diff \model=Llama-3.2-3B-Instruct \model.model_args.pretrained_model_name_or_path=saves/finetune/SAMPLE_TRAIN
-
-unlearn's eval
-            CUDA_VISIBLE_DEVICES=0 python src/eval.py \
-            experiment=eval/tofu/default.yaml \
-            forget_split=forget10 \
-            holdout_split=retain90 \
-            task_name=Fed_Grad_diff \
-            model.model_args.pretrained_model_name_or_path=saves/unlearn/Fed_Grad_diff \
-            paths.output_dir=saves/unlearn/Fed_Grad_diff/evals \
-            retain_logs_path=saves/eval/SAMPLE_TRAIN/TOFU_EVAL.json
-
-"""
 @hydra.main(version_base=None, config_path="../configs", config_name="train.yaml")
 def main(cfg: DictConfig):
     seed_everything(cfg.trainer.args.seed)
@@ -155,8 +115,10 @@ def main(cfg: DictConfig):
         trainer.save_state()
         trainer.save_model(trainer_args.output_dir)
 
-    if trainer_args.do_eval:
-        trainer.evaluate(metric_key_prefix="eval")
+    # trainer_args.do_eval = False
+
+    # if trainer_args.do_eval:
+    #     trainer.evaluate(metric_key_prefix="eval")
 
 
 if __name__ == "__main__":

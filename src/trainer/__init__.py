@@ -2,6 +2,8 @@ import torch
 from typing import Dict, Any
 from omegaconf import DictConfig
 from transformers import Trainer, TrainingArguments
+from peft import PeftModel, PeftConfig, get_peft_model, LoraConfig
+from transformers import AutoModelForCausalLM
 
 from trainer.base import FinetuneTrainer
 from trainer.unlearn.grad_ascent import GradAscent
@@ -11,8 +13,9 @@ from trainer.unlearn.dpo import DPO
 from trainer.unlearn.simnpo import SimNPO
 from trainer.unlearn.rmu import RMU
 from trainer.federated.federated_unlearning import FederatedUnlearningTrainer
-from .federated.fed_finetune import FederatedFinetuneTrainer
+from trainer.federated.fed_finetune import FederatedFinetuneTrainer
 import logging
+
 
 logger = logging.getLogger(__name__)
 

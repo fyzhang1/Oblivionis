@@ -7,23 +7,23 @@ method_args:
 args:
   output_dir: saves/finetune/${task_name}
   logging_dir: ${trainer.args.output_dir}/logs
-  per_device_train_batch_size: 8
-  per_device_eval_batch_size: 16
-  gradient_accumulation_steps: 4
+  per_device_train_batch_size: 4  # 减少批次大小，降低内存占用
+  per_device_eval_batch_size: 8   # 减少评估批次大小
+  gradient_accumulation_steps: 8  # 增加梯度累积步数，保持有效批次大小
   learning_rate: 1e-5
   bf16: True
   bf16_full_eval: True
   logging_steps: 5
   report_to: tensorboard
   ddp_find_unused_parameters: None
-  gradient_checkpointing: False
+  gradient_checkpointing: True  # 启用梯度检查点，节省内存
   optim: paged_adamw_32bit
   save_strategy: 'no'
   save_only_model: True
   weight_decay: 0.00
   do_train: True
-  do_eval: True
-  eval_on_start: True
-  eval_strategy: epoch
-  num_train_epochs: 10
+  do_eval: False
+  eval_on_start: False
+  eval_strategy: 'no'
+  num_train_epochs: 5
   seed: 0

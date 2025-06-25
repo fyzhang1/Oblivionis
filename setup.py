@@ -1,4 +1,8 @@
+# Update: Xinyu Yan, 2025-06-21
+# TL;DR: This file is used to setup the project
+
 from setuptools import setup, find_packages
+
 
 # Read dependencies from requirements.txt
 with open("requirements.txt") as f:
@@ -25,5 +29,5 @@ setup(
             "ruff==0.6.9",
         ],  # Install using `pip install .[dev]`
     },
-    python_requires=">=3.11",
+    python_requires=">=3.10",
 )

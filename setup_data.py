@@ -1,3 +1,6 @@
+# Update: Xinyu Yan, 2025-06-21
+# TL;DR: This file is used to download the evaluation data
+
 import argparse
 import os
 import subprocess
