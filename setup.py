@@ -29,5 +29,5 @@ setup(
             "ruff==0.6.9",
         ],  # Install using `pip install .[dev]`
     },
-    python_requires=">=3.10",
+    python_requires=">=3.11",
 )

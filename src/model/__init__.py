@@ -3,8 +3,6 @@ from omegaconf import DictConfig, open_dict
 import os
 import torch
 import logging
-from typing import Union, Tuple
-from vllm import LLM, SamplingParams
 from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 
 hf_home = os.getenv("HF_HOME", default=None)
@@ -34,63 +32,22 @@ def get_dtype(model_args):
     return torch.float32
 
 
-def get_model(model_cfg: DictConfig) -> Union[Tuple[AutoModelForCausalLM, AutoTokenizer], Tuple[LLM, AutoTokenizer]]:
+def get_model(model_cfg: DictConfig):
     assert model_cfg is not None and model_cfg.model_args is not None, ValueError(
         "Model config not found or model_args absent in configs/model."
     )
     model_args = model_cfg.model_args
     tokenizer_args = model_cfg.tokenizer_args
-    
-    # Check if we should use vLLM
-    use_vllm = model_args.get("use_vllm", False)
-    
-    if use_vllm:
-        return get_vllm_model(model_args, tokenizer_args)
-    else:
-        return get_transformers_model(model_args, tokenizer_args)
-
-
-def get_vllm_model(model_args: DictConfig, tokenizer_args: DictConfig) -> Tuple[LLM, AutoTokenizer]:
-    """Load model using vLLM backend."""
-    try:
-        # Convert DictConfig to dict for vLLM
-        vllm_args = {
-            "model": model_args.pretrained_model_name_or_path,
-            "tensor_parallel_size": model_args.get("tensor_parallel_size", 1),
-            "gpu_memory_utilization": model_args.get("gpu_memory_utilization", 0.9),
-            "trust_remote_code": model_args.get("trust_remote_code", True),
-            "max_model_len": model_args.get("max_model_len", 4096),
-            "quantization": model_args.get("quantization", None),
-            "enforce_eager": model_args.get("enforce_eager", False),
-            "max_num_batched_tokens": model_args.get("max_num_batched_tokens", 4096),
-            "max_num_seqs": model_args.get("max_num_seqs", 256),
-        }
-        model = LLM(**vllm_args)
-    except Exception as e:
-        logger.warning(
-            f"Model {model_args.pretrained_model_name_or_path} requested with {model_args}"
-        )
-        raise ValueError(
-            f"Error {e} while fetching model using vLLM.LLM()."
-        )
-    tokenizer = get_tokenizer(tokenizer_args)
-    return model, tokenizer
-
-
-def get_transformers_model(model_args: DictConfig, tokenizer_args: DictConfig) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
-    """Load model using Transformers backend."""
     torch_dtype = get_dtype(model_args)
-    
-    # Check if we need to load a PEFT model
+
+    # LoRA
     use_lora = model_args.get("use_lora", False)
     lora_config = model_args.get("lora_config", None)
     lora_model_path = model_args.get("lora_model_path", None)
-    
+
     try:
-        # Convert DictConfig to dict for transformers
+        # Convert DictConfig to dict for transformersAdd commentMore actions
         transformers_args = {
-            "torch_dtype": torch_dtype,
-            "pretrained_model_name_or_path": model_args.pretrained_model_name_or_path,
             "trust_remote_code": model_args.get("trust_remote_code", True),
             "cache_dir": hf_home
         }
@@ -129,10 +86,10 @@ def get_transformers_model(model_args: DictConfig, tokenizer_args: DictConfig) -
         else:
             # Load standard model without LoRA
             model = AutoModelForCausalLM.from_pretrained(**transformers_args)
-            
+    
     except Exception as e:
         logger.warning(
-            f"Model {model_args.pretrained_model_name_or_path} requested with {model_args}"
+            f"Model {model_args.pretrained_model_name_or_path} requested with {model_cfg.model_args}"
         )
         raise ValueError(
             f"Error {e} while fetching model using AutoModelForCausalLM.from_pretrained()."
