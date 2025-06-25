@@ -2,6 +2,7 @@
 # TL;DR: This file is used to ignore the files that are not needed to be tracked by git
 
 # Customized .gitignore
+.github/
 log*/
 unity*/
 cache*/
