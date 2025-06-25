@@ -1,3 +1,6 @@
+# Update: Xinyu Yan, 2025-06-21
+# TL;DR: This file is used to collate the data for fine-tuning
+
 import torch
 import transformers
 from typing import Dict, Sequence

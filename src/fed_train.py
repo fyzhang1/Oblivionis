@@ -20,7 +20,7 @@ def main(cfg: DictConfig):
 
     data_cfg = cfg.data
     data = get_data(data_cfg, mode=mode, tokenizer=tokenizer, template_args=template_args)
-    print("-------------------------------------------------init data----------------------------------")
+    print("----------Initializing Data...----------")
     print(data)
     
     is_federated = cfg.trainer.handler in ["FederatedUnlearningTrainer", "FederatedFinetuneTrainer"]
