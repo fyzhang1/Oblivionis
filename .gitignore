@@ -1,6 +1,7 @@
 # Update: Xinyu Yan, 2025-06-25
 # TL;DR: This file is used to ignore the files that are not needed to be tracked by git
 
+
 # Customized .gitignore
 .github/
 log*/
@@ -13,7 +14,6 @@ notebook*/
 output*/
 saves*/
 wandb*/
-memory_log.txt
 
 # Byte-Compiled / Optimized / DLL Files
 __pycache__/
