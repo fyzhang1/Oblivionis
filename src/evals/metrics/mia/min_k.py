@@ -3,6 +3,8 @@ Min-k % Prob Attack: https://arxiv.org/pdf/2310.16789.pdf
 """
 
 import numpy as np
+import torch
+
 from evals.metrics.mia.all_attacks import Attack
 from evals.metrics.utils import tokenwise_logprobs
 
@@ -17,7 +19,12 @@ class MinKProbAttack(Attack):
 
     def compute_score(self, sample_stats):
         """Score single sample using min-k negative log probs scores attack."""
-        lp = sample_stats.cpu().numpy()
+        # lp = sample_stats.cpu().numpy()
+
+        if sample_stats.dtype == torch.bfloat16:
+            sample_stats = sample_stats.to(torch.float32)
+        lp = sample_stats.detach().cpu().numpy()
+
         if lp.size == 0:
             return 0
 
