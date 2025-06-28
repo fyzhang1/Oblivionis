@@ -7,6 +7,9 @@ from evals import get_evaluator
 from trainer.utils import seed_everything
 from torch.utils.data import Subset
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train.yaml")
@@ -16,12 +19,19 @@ def main(cfg: DictConfig):
     model_cfg = cfg.model
     template_args = model_cfg.template_args
     assert model_cfg is not None, "Invalid model yaml passed in train config."
+    
+    # 添加调试信息
+    logger.info(f"Model Configuration: {model_cfg}")
+    logger.info(f"Model Args: {model_cfg.model_args}")
+    logger.info(f"Use LoRA: {model_cfg.model_args.get('use_lora', 'NOT_FOUND')}")
+    logger.info(f"LoRA Configuration: {model_cfg.model_args.get('lora_config', 'NOT_FOUND')}")
+    
     model, tokenizer = get_model(model_cfg)
 
     data_cfg = cfg.data
     data = get_data(data_cfg, mode=mode, tokenizer=tokenizer, template_args=template_args)
-    print("----------Initializing Data...----------")
-    print(data)
+    logger.info(f"----------Initializing Data...----------")
+    logger.info(data)
     
     is_federated = cfg.trainer.handler in ["FederatedUnlearningTrainer", "FederatedFinetuneTrainer"]
     
@@ -35,6 +45,7 @@ def main(cfg: DictConfig):
             federated_data = get_federated_data(
                 data, num_clients=num_clients, target_client_idx=target_client_idx
             )
+
         # else:  # mode == "train" for federated fine-tuning
         #     if "train" not in data:
         #         raise ValueError("Training data must be in data dictionary")
@@ -49,6 +60,7 @@ def main(cfg: DictConfig):
         #         start_idx = i * client_size
         #         end_idx = start_idx + client_size if i < num_clients - 1 else dataset_size
         #         federated_data[i] = train_data[start_idx:end_idx]
+
         else:  # mode == "train" for federated fine-tuning
             if "train" not in data:
                 raise ValueError("Training data must be in data dictionary")

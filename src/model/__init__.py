@@ -78,7 +78,20 @@ def get_model(model_cfg: DictConfig):
             
             # Update with user config if provided
             if lora_config:
-                default_lora_config.update(lora_config)
+                # Convert DictConfig to regular dict to avoid JSON serialization issues
+                if hasattr(lora_config, '_content'):
+                    # Handle DictConfig
+                    lora_config_dict = {}
+                    for key, value in lora_config.items():
+                        if hasattr(value, '_content'):
+                            # Convert ListConfig to regular list
+                            lora_config_dict[key] = list(value)
+                        else:
+                            lora_config_dict[key] = value
+                    default_lora_config.update(lora_config_dict)
+                else:
+                    # Handle regular dict
+                    default_lora_config.update(lora_config)
             
             peft_config = LoraConfig(**default_lora_config)
             model = get_peft_model(base_model, peft_config)

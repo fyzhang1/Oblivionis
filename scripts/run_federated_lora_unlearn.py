@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 @hydra.main(version_base=None, config_path="../configs", config_name="unlearn-lora.yaml")
 def main(cfg: DictConfig):
     # 导入需要的模块
-    from fed_train import main as fed_main
+    from federated_train import main as federated_main
     
     # 打印配置信息
     logger.info("=" * 60)
@@ -68,7 +68,7 @@ def main(cfg: DictConfig):
     logger.info("=" * 60)
     
     # 调用原始的fed_train主函数
-    fed_main(cfg)
+    federated_main(cfg)
 
 if __name__ == "__main__":
     main() 

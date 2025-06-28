@@ -277,7 +277,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             for model in self.client_models:
                 model = model.cpu()
                 # 只获取PEFT适配器的状态字典
-                peft_state_dict = model.get_peft_state_dict()
+                peft_state_dict = model.get_adapter_state_dict()
                 client_state_dicts.append(peft_state_dict)
         else:
             # 对于普通模型，聚合所有参数
@@ -287,7 +287,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         
         if self.is_peft:
             # 获取当前全局模型的PEFT状态字典
-            global_peft_state_dict = self.model.cpu().get_peft_state_dict()
+            global_peft_state_dict = self.model.cpu().get_adapter_state_dict()
         else:
             global_peft_state_dict = self.model.cpu().state_dict()
 
@@ -345,7 +345,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             
         if self.is_peft:
             # 对于PEFT模型，只加载PEFT适配器的权重
-            self.model.load_peft_state_dict(global_state_dict)
+            self.model._load_from_state_dict(global_state_dict)
         else:
             # 对于普通模型，加载所有权重
             self.model.load_state_dict(global_state_dict)

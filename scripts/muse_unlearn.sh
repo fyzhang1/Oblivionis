@@ -43,7 +43,7 @@ for data_split in "${data_splits[@]}"; do
         trainer.args.per_device_train_batch_size=${per_device_train_batch_size} \
         trainer.args.gradient_accumulation_steps=${gradient_accumulation_steps} \
         trainer.args.ddp_find_unused_parameters=true \
-        trainer.args.gradient_checkpointing=true
+        trainer.args.gradient_checkpointing=false
 
         CUDA_VISIBLE_DEVICES=0 python src/eval.py \
         experiment=eval/muse/default.yaml \
@@ -81,7 +81,7 @@ for data_split in "${data_splits[@]}"; do
             trainer.args.per_device_train_batch_size=${per_device_train_batch_size} \
             trainer.args.gradient_accumulation_steps=${gradient_accumulation_steps} \
             trainer.args.ddp_find_unused_parameters=true \
-            trainer.args.gradient_checkpointing=true
+            trainer.args.gradient_checkpointing=false
 
             CUDA_VISIBLE_DEVICES=0 python src/eval.py \
             experiment=eval/muse/default.yaml \
@@ -121,7 +121,7 @@ for data_split in "${data_splits[@]}"; do
             trainer.args.per_device_train_batch_size=${per_device_train_batch_size} \
             trainer.args.gradient_accumulation_steps=${gradient_accumulation_steps} \
             trainer.args.ddp_find_unused_parameters=true \
-            trainer.args.gradient_checkpointing=true
+            trainer.args.gradient_checkpointing=false
 
             CUDA_VISIBLE_DEVICES=0 python src/eval.py \
             experiment=eval/muse/default.yaml \

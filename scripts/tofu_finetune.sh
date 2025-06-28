@@ -37,7 +37,7 @@ for split in "${splits[@]}"; do
         data.train.TOFU_QA_retain.args.hf_args.name=${retain_split} \
         trainer.args.per_device_train_batch_size=4 \
         trainer.args.ddp_find_unused_parameters=true \
-        trainer.args.gradient_checkpointing=true
+        trainer.args.gradient_checkpointing=false
 
     
         CUDA_VISIBLE_DEVICES=0 python src/eval.py experiment=eval/tofu/default.yaml \
@@ -64,7 +64,7 @@ for model in "${models[@]}"; do
     data.train.TOFU_QA_full.args.hf_args.name=full \
     trainer.args.per_device_train_batch_size=4 \
     trainer.args.ddp_find_unused_parameters=true \
-    trainer.args.gradient_checkpointing=true
+    trainer.args.gradient_checkpointing=false
 
     # Evaluate the full models on each forget split
     for split in "${splits[@]}"; do

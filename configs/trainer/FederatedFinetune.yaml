@@ -16,7 +16,7 @@ args:
   logging_steps: 5
   report_to: tensorboard
   ddp_find_unused_parameters: None
-  gradient_checkpointing: True  # 启用梯度检查点，节省内存
+  gradient_checkpointing: False  # 禁用梯度检查点，解决LoRA兼容性问题
   optim: paged_adamw_32bit
   save_strategy: 'no'
   save_only_model: True

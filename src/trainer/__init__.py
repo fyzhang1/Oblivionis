@@ -13,7 +13,7 @@ from trainer.unlearn.dpo import DPO
 from trainer.unlearn.simnpo import SimNPO
 from trainer.unlearn.rmu import RMU
 from trainer.federated.federated_unlearning import FederatedUnlearningTrainer
-from trainer.federated.fed_finetune import FederatedFinetuneTrainer
+from trainer.federated.federated_finetune import FederatedFinetuneTrainer
 import logging
 
 
