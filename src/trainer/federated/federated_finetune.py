@@ -59,7 +59,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         self.server_velocity = None  # 用于FedAdagrad、FedAdam、FedYogi
         
         # 为算法特定参数设置默认值
-        self.fed_args = {
+        self.federated_args = {
             'server_lr': kwargs.get('server_lr', 1.0),
             'beta1': kwargs.get('beta1', 0.9),
             'beta2': kwargs.get('beta2', 0.99),
@@ -157,7 +157,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                 evaluator=self.evaluator,
                 template_args=self.template_args,
                 global_model=self.model.cpu(),  # 传递CPU上的全局模型
-                mu=self.fed_args['mu']
+                mu=self.federated_args['mu']
             )
         else:
             trainer = FinetuneTrainer(
@@ -207,16 +207,16 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
                 server_momentum=self.server_momentum,
-                momentum_factor=self.fed_args['momentum_factor']
+                momentum_factor=self.federated_args['momentum_factor']
             )
         elif self.aggregation_strategy == "FedAdagrad":
             global_state_dict, self.server_velocity = FedAdagrad(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
                 server_velocity=self.server_velocity,
-                learning_rate=self.fed_args['server_lr'],
-                epsilon=self.fed_args['epsilon'],
-                tau=self.fed_args['tau']
+                learning_rate=self.federated_args['server_lr'],
+                epsilon=self.federated_args['epsilon'],
+                tau=self.federated_args['tau']
             )
         elif self.aggregation_strategy == "FedYogi":
             global_state_dict, self.server_velocity, self.server_momentum = FedYogi(
@@ -224,11 +224,11 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                 global_model_state_dict=global_peft_state_dict,
                 server_velocity=self.server_velocity,
                 server_momentum=self.server_momentum,
-                learning_rate=self.fed_args['server_lr'],
-                beta1=self.fed_args['beta1'],
-                beta2=self.fed_args['beta2'],
-                epsilon=self.fed_args['epsilon'],
-                tau=self.fed_args['tau']
+                learning_rate=self.federated_args['server_lr'],
+                beta1=self.federated_args['beta1'],
+                beta2=self.federated_args['beta2'],
+                epsilon=self.federated_args['epsilon'],
+                tau=self.federated_args['tau']
             )
         elif self.aggregation_strategy == "FedAdam":
             global_state_dict, self.server_velocity, self.server_momentum = FedAdam(
@@ -236,17 +236,17 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                 global_model_state_dict=global_peft_state_dict,
                 server_velocity=self.server_velocity,
                 server_momentum=self.server_momentum,
-                learning_rate=self.fed_args['server_lr'],
-                beta1=self.fed_args['beta1'],
-                beta2=self.fed_args['beta2'],
-                epsilon=self.fed_args['epsilon'],
-                tau=self.fed_args['tau']
+                learning_rate=self.federated_args['server_lr'],
+                beta1=self.federated_args['beta1'],
+                beta2=self.federated_args['beta2'],
+                epsilon=self.federated_args['epsilon'],
+                tau=self.federated_args['tau']
             )
         elif self.aggregation_strategy == "FedProx":
             global_state_dict = FedProx(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
-                mu=self.fed_args['mu']
+                mu=self.federated_args['mu']
             )
         
         if self.is_peft:
