@@ -6,7 +6,7 @@ from typing import Dict, List, Any, Optional
 from trainer.base import FinetuneTrainer
 from torch.utils.data import Dataset
 from trainer.federated.federated_utils import *
-from peft import PeftModel
+from peft import PeftModel, get_peft_model_state_dict, set_peft_model_state_dict
 import os
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,8 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         logger.info(f"Initialized with {num_clients} clients, global rounds: {global_rounds}")
         logger.info(f"Model type - PEFT: {self.is_peft}")
     
-    def train(self, resume_from_checkpoint=None, trial=None, **kwargs):
+
+    def train(self, **kwargs):
         """执行联邦学习训练过程"""
                 
         # 将全局模型移到CPU，以节省GPU内存
@@ -104,13 +105,20 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                 client_dataset = self.federated_dataset[client_idx]
                 
                 logger.info(f"Training on client {client_idx}")
-                self._train_client_model(client_model, client_dataset)
+                logger.info(f"Client {client_idx} dataset size: {len(client_dataset)} samples")
+                logger.info(f"Training args - Batch size: {self.args.per_device_train_batch_size}, Epochs: {self.args.num_train_epochs}")
+                if hasattr(self.args, 'max_steps') and self.args.max_steps > 0:
+                    logger.info(f"Max steps limit: {self.args.max_steps}")
                 
-                # 训练完成后将模型移回CPU
-                self.client_models[client_idx] = client_model.cpu()
+                trained_client_model = self.train_client_model(client_model, client_dataset)
+                
+                # 训练完成后将训练后的模型保存到client_models
+                self.client_models[client_idx] = trained_client_model
+                # # 记录参与训练的客户端索引
+                # self.trained_client_indices.append(client_idx)
             
             # 聚合模型 - 结果已经直接更新到self.model
-            self._aggregate_models()
+            self.aggregate_models()
             logger.info(f"Completed global round {round_idx + 1}/{self.global_rounds}")
             
             # 保存状态
@@ -124,7 +132,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         self.save_state()
         return None
 
-    def _train_client_model(self, client_model, client_dataset):
+    def train_client_model(self, client_model, client_dataset):
         """训练单个客户端模型"""
         if self.aggregation_strategy == "FedProx":
             class FedProxTrainer(FinetuneTrainer):
@@ -139,12 +147,12 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                     
                     proximal_term = 0.0
                     if self.global_model is not None:
-                        for w, w_t in zip(model.parameters(), self.global_model.parameters()):
+                        # FedProx的近端项应该只计算在可训练的参数上
+                        for (name, w), (global_name, w_t) in zip(model.named_parameters(), self.global_model.named_parameters()):
                             if w.requires_grad:
-                                proximal_term += torch.norm(w - w_t.detach()) ** 2
+                                proximal_term += torch.sum(torch.pow(w - w_t.to(w.device).detach(), 2))
                                 
-                        proximal_term = (self.mu / 2) * proximal_term
-                        loss += proximal_term
+                        loss += (self.mu / 2) * proximal_term
                         
                     return (loss, outputs) if return_outputs else loss
                 
@@ -171,9 +179,13 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
             )
         
         trainer.train()
-        return trainer
+        # return trainer
+        
+        # 重要：确保训练后的模型状态被正确返回
+        trained_model = trainer.model.cpu()
+        return trained_model
 
-    def _aggregate_models(self):
+    def aggregate_models(self):
         """聚合所有客户端模型"""
         logger.info("Aggregating client models")
         
@@ -183,8 +195,16 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
             for model in self.client_models:
                 model = model.cpu()
                 # 只获取PEFT适配器的状态字典
-                peft_state_dict = model.get_peft_state_dict()
+                peft_state_dict = get_peft_model_state_dict(model)
+                # 可以尝试下面
+                # peft_state_dict = copy.deepcopy(get_peft_model_state_dict(model)
+                
+                if not peft_state_dict:
+                    logger.warning(f"Client {model} has no PEFT state dict")
+                    continue
+            
                 client_state_dicts.append(peft_state_dict)
+                logger.debug(f"Client {model} has PEFT state dict")
         else:
             # 对于普通模型，聚合所有参数
             client_state_dicts = [model.cpu().state_dict() for model in self.client_models]
@@ -193,7 +213,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         
         if self.is_peft:
             # 获取当前全局模型的PEFT状态字典
-            global_peft_state_dict = self.model.cpu().get_peft_state_dict()
+            global_peft_state_dict = get_peft_model_state_dict(self.model.cpu())
         else:
             global_peft_state_dict = self.model.cpu().state_dict()
         
@@ -251,14 +271,16 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         
         if self.is_peft:
             # 对于PEFT模型，只加载PEFT适配器的权重
-            self.model.load_peft_state_dict(global_state_dict)
+            # self.model.load_state_dict(global_state_dict, strict=False)
+            # set_peft_model_state_dict(self.model, global_state_dict)
+            self.model.set_peft_model_state_dict(global_state_dict)
         else:
             # 对于普通模型，加载所有权重
             self.model.load_state_dict(global_state_dict)
             
         logger.info("Global model updated")
 
-    def save_model(self, output_dir=None, state_dict=None):
+    def save_model(self, output_dir=None):
         """保存模型，支持PEFT模型"""
         if output_dir is None:
             output_dir = self.args.output_dir
@@ -274,4 +296,4 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                 self.tokenizer.save_pretrained(output_dir)
         else:
             # 保存普通模型
-            super().save_model(output_dir, state_dict)
+            super().save_model(output_dir)

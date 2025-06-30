@@ -16,7 +16,7 @@ setup(
     description="A Unified Framework for Large Language Model Unlearning on Private Data via Federated Learning.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/fyzhang1/FedLLMUnlearning",
+    url="https://github.com/fyzhang1/Oblivionis",
     license="MIT",
     packages=find_packages(),
     install_requires=requirements,  # Uses requirements.txt

@@ -20,6 +20,22 @@ def main(cfg: DictConfig):
     template_args = model_cfg.template_args
     assert model_cfg is not None, "Invalid model yaml passed in train config."
     
+
+     # Print training configuration
+    logger.info(f"-----Training Configuration-----")
+    if hasattr(cfg.trainer, 'args'):
+        trainer_args = cfg.trainer.args
+        logger.info(f"Learning Rate: {getattr(trainer_args, 'learning_rate', 'N/A')}")
+        logger.info(f"Batch Size: {getattr(trainer_args, 'per_device_train_batch_size', 'N/A')}")
+        logger.info(f"Num Epochs: {getattr(trainer_args, 'num_train_epochs', 'N/A')}")
+        logger.info(f"Warmup Steps: {getattr(trainer_args, 'warmup_steps', 'N/A')}")
+        logger.info(f"Seed: {getattr(trainer_args, 'seed', 'N/A')}")
+        logger.info(f"Output Dir: {getattr(trainer_args, 'output_dir', 'N/A')}")
+        logger.info(f"Gradient Accumulation Steps: {getattr(trainer_args, 'gradient_accumulation_steps', 'N/A')}")
+        logger.info(f"Weight Decay: {getattr(trainer_args, 'weight_decay', 'N/A')}")
+        logger.info(f"LR Scheduler Type: {getattr(trainer_args, 'lr_scheduler_type', 'N/A')}")
+    logger.info(f"------------------------------")
+
     # 添加调试信息
     logger.info(f"Model Configuration: {model_cfg}")
     logger.info(f"Model Args: {model_cfg.model_args}")
@@ -30,7 +46,7 @@ def main(cfg: DictConfig):
 
     data_cfg = cfg.data
     data = get_data(data_cfg, mode=mode, tokenizer=tokenizer, template_args=template_args)
-    logger.info(f"----------Initializing Data...----------")
+    logger.info(f"----------Initializing Data----------")
     logger.info(data)
     
     is_federated = cfg.trainer.handler in ["FederatedUnlearningTrainer", "FederatedFinetuneTrainer"]

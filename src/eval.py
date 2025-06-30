@@ -1,11 +1,11 @@
 import hydra
-from omegaconf import DictConfig
+import torch
 
+from omegaconf import DictConfig
 from trainer.utils import seed_everything
 from model import get_model
 from evals import get_evaluators
 
-# python src/eval.py  experiment=eval/tofu/default.yaml task_name=test
 
 @hydra.main(version_base=None, config_path="../configs", config_name="eval.yaml")
 def main(cfg: DictConfig):
@@ -18,6 +18,11 @@ def main(cfg: DictConfig):
     template_args = model_cfg.template_args
     assert model_cfg is not None, "Invalid model yaml passed in train config."
     model, tokenizer = get_model(model_cfg)
+
+    # Move model to device)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    print(f"Model is moved to device: {device}")
 
     eval_cfgs = cfg.eval
     evaluators = get_evaluators(eval_cfgs)

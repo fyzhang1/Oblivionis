@@ -8,7 +8,7 @@ from trainer.unlearn.base import UnlearnTrainer
 from data.unlearn import ForgetRetainDataset
 from torch.utils.data import Dataset
 from trainer.federated.federated_utils import *
-from peft import PeftModel
+from peft import PeftModel, get_peft_model_state_dict, set_peft_model_state_dict
 
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         if self.target_client_idx in self.federated_dataset:
             target_dataset = self.federated_dataset[self.target_client_idx]
             # 使用当前全局模型进行unlearning
-            self._unlearn_client_model(deepcopy(self.model), target_dataset)
+            self.unlearn_client_model(self.model, target_dataset)            
             
             # 步骤2: 将unlearning后的模型设为新的全局模型
             # self.model = self.model
@@ -131,14 +131,14 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 client_dataset = self.federated_dataset[client_idx]
                 
                 logger.info(f"Training client {client_idx} on retain data")
-                self._train_client_model(client_model, client_dataset)
+                self.train_client_model(client_model, client_dataset)
                 
                 # 训练完成后将模型移回CPU
                 self.client_models[client_idx] = client_model.cpu()
 
             # 步骤4: 聚合所有客户端模型
             logger.info("Step 3: Aggregating all client models")
-            self._aggregate_models()
+            self.aggregate_models()
             logger.info(f"Completed global round {round_idx + 1}/{self.global_rounds}")
             
             # 保存状态
@@ -152,7 +152,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         self.save_state()
         return None
 
-    def _unlearn_client_model(self, client_model, client_dataset):
+    def unlearn_client_model(self, client_model, client_dataset):
         from trainer import TRAINER_REGISTRY
         trainer_cls = TRAINER_REGISTRY.get(self.unlearn_trainer_cls, None)
         
@@ -216,7 +216,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         return unlearn_trainer
     
 
-    def _train_client_model(self, client_model, client_dataset):
+    def train_client_model(self, client_model, client_dataset):
         retain_dataset = client_dataset.retain
         retain_data = retain_dataset.retain
         
@@ -268,7 +268,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         return trainer
     
 
-    def _aggregate_models(self):
+    def aggregate_models(self):
         logger.info("Aggregating client models")
 
         if self.is_peft:
@@ -277,7 +277,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             for model in self.client_models:
                 model = model.cpu()
                 # 只获取PEFT适配器的状态字典
-                peft_state_dict = model.get_adapter_state_dict()
+                peft_state_dict = model.get_peft_model_state_dict()
                 client_state_dicts.append(peft_state_dict)
         else:
             # 对于普通模型，聚合所有参数
@@ -287,7 +287,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         
         if self.is_peft:
             # 获取当前全局模型的PEFT状态字典
-            global_peft_state_dict = self.model.cpu().get_adapter_state_dict()
+            global_peft_state_dict = self.model.cpu().get_peft_model_state_dict()
         else:
             global_peft_state_dict = self.model.cpu().state_dict()
 
@@ -345,7 +345,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             
         if self.is_peft:
             # 对于PEFT模型，只加载PEFT适配器的权重
-            self.model._load_from_state_dict(global_state_dict)
+            self.model.set_peft_model_state_dict(global_state_dict)
         else:
             # 对于普通模型，加载所有权重
             self.model.load_state_dict(global_state_dict)
