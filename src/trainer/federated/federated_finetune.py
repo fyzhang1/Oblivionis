@@ -272,8 +272,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         if self.is_peft:
             # 对于PEFT模型，只加载PEFT适配器的权重
             # self.model.load_state_dict(global_state_dict, strict=False)
-            # set_peft_model_state_dict(self.model, global_state_dict)
-            self.model.set_peft_model_state_dict(global_state_dict)
+            set_peft_model_state_dict(self.model, global_state_dict)
         else:
             # 对于普通模型，加载所有权重
             self.model.load_state_dict(global_state_dict)
