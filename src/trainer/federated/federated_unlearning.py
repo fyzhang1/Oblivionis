@@ -275,9 +275,10 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             # 对于PEFT模型，只聚合可训练的参数（LoRA权重）
             client_state_dicts = []
             for model in self.client_models:
-                model = model.cpu()
                 # 只获取PEFT适配器的状态字典
-                peft_state_dict = model.get_peft_model_state_dict()
+                # model = model.cpu()
+                # peft_state_dict = model.get_peft_model_state_dict()
+                peft_state_dict = get_peft_model_state_dict(model.cpu())
                 client_state_dicts.append(peft_state_dict)
         else:
             # 对于普通模型，聚合所有参数
@@ -287,7 +288,8 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         
         if self.is_peft:
             # 获取当前全局模型的PEFT状态字典
-            global_peft_state_dict = self.model.cpu().get_peft_model_state_dict()
+            # global_peft_state_dict = self.model.cpu().get_peft_model_state_dict()
+            global_peft_state_dict = get_peft_model_state_dict(self.model.cpu())
         else:
             global_peft_state_dict = self.model.cpu().state_dict()
 
