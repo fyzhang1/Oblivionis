@@ -9,10 +9,10 @@ defaults:
 mode: FederatedFinetune
 trainer:
   args:
-    learning_rate: 1e-5
+    learning_rate: 8e-5
     weight_decay: 0.01
     warmup_epochs: 1.0 # custom parameter
-    num_train_epochs: 5
+    num_train_epochs: 2
 
 
 forget_split: forget10

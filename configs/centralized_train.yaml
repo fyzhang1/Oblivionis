@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - model: Llama-3.2-3B-Instruct-lora
+  - model: Llama-3.2-3B-Instruct
   - trainer: finetune #FederatedFinetune
   - data: finetune
   - collator: DataCollatorForSupervisedDataset

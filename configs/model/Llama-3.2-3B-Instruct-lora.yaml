@@ -4,11 +4,11 @@ model_args:
   torch_dtype: bfloat16
   use_lora: true
   lora_config:
-    r: 16
-    lora_alpha: 32
+    r: 32
+    lora_alpha: 64
     target_modules: ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-    lora_dropout: 0.1
-    bias: "none"
+    lora_dropout: 0.05
+    bias: 'none'
 tokenizer_args:
   pretrained_model_name_or_path: "meta-llama/Llama-3.2-3B-Instruct"
 template_args:
