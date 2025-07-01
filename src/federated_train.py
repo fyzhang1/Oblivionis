@@ -44,6 +44,11 @@ def main(cfg: DictConfig):
     
     model, tokenizer = get_model(model_cfg)
 
+    # PEFT信息
+    if hasattr(model, "peft_config"):
+        adapter_names = list(model.peft_config.keys())
+        logger.info(f"Loaded adapters: {adapter_names}")
+
     data_cfg = cfg.data
     data = get_data(data_cfg, mode=mode, tokenizer=tokenizer, template_args=template_args)
     logger.info(f"----------Initializing Data----------")
