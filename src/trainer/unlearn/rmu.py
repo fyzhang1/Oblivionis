@@ -9,8 +9,8 @@ from peft import PeftModel
 class RMU(GradDiff):
     def __init__(
         self,
-        module_regex="model\.layers\.7",
-        trainable_params_regex=["model\.layers\.(5|6|7)\.mlp\.down_proj\.weight"],
+        module_regex=r"model\.layers\.7",
+        trainable_params_regex=[r"model\.layers\.(5|6|7)\.mlp\.down_proj\.weight"],
         steering_coeff=20,
         *args,
         **kwargs,
