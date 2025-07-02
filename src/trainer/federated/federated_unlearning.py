@@ -138,7 +138,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
 
             # 步骤4: 聚合所有客户端模型
             logger.info("Step 3: Aggregating all client models")
-            self.aggregate_models()
+            self.aggregate_models(round_idx)
             logger.info(f"Completed global round {round_idx + 1}/{self.global_rounds}")
             
             # 保存状态
@@ -281,7 +281,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         return trainer
     
 
-    def aggregate_models(self):
+    def aggregate_models(self, round_idx=0):
         logger.info("Aggregating client models")
 
         if self.is_peft:
@@ -312,40 +312,35 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 global_model_state_dict=global_peft_state_dict
             )
         elif self.aggregation_strategy == "FedAvgM":
-            global_state_dict, self.server_momentum = FedAvgM(
+            global_state_dict = FedAvgM(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
-                server_momentum=self.server_momentum,
-                momentum_factor=self.federated_args['momentum_factor']
+                round_idx=round_idx,
+                momentum_factor=self.federated_args['momentum_factor'],
+                tau=self.federated_args['tau']
             )
         elif self.aggregation_strategy == "FedAdagrad":
-            global_state_dict, self.server_velocity = FedAdagrad(
+            global_state_dict = FedAdagrad(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
-                server_velocity=self.server_velocity,
-                learning_rate=self.federated_args['server_lr'],
                 epsilon=self.federated_args['epsilon'],
                 tau=self.federated_args['tau']
             )
         elif self.aggregation_strategy == "FedYogi":
-            global_state_dict, self.server_velocity, self.server_momentum = FedYogi(
+            global_state_dict = FedYogi(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
-                server_velocity=self.server_velocity,
-                server_momentum=self.server_momentum,
-                learning_rate=self.federated_args['server_lr'],
+                round_idx=round_idx,
                 beta1=self.federated_args['beta1'],
                 beta2=self.federated_args['beta2'],
                 epsilon=self.federated_args['epsilon'],
                 tau=self.federated_args['tau']
             )
         elif self.aggregation_strategy == "FedAdam":
-            global_state_dict, self.server_velocity, self.server_momentum = FedAdam(
+            global_state_dict = FedAdam(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
-                server_velocity=self.server_velocity,
-                server_momentum=self.server_momentum,
-                learning_rate=self.federated_args['server_lr'],
+                round_idx=round_idx,
                 beta1=self.federated_args['beta1'],
                 beta2=self.federated_args['beta2'],
                 epsilon=self.federated_args['epsilon'],
