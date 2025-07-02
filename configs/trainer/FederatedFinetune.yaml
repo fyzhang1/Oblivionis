@@ -1,7 +1,7 @@
 handler: FederatedFinetuneTrainer
 method_args:
   num_clients: 3  # Total number of clients in federated learning
-  aggregation_strategy: "FedProx"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
+  aggregation_strategy: "FedAvg"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
   global_rounds: 10  # 全局训练轮数设置
 
 args:
