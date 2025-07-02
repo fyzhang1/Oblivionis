@@ -236,11 +236,12 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                 global_model_state_dict=global_peft_state_dict
             )
         elif self.aggregation_strategy == "FedAvgM":
-            global_state_dict, self.server_momentum = FedAvgM(
+            global_state_dict = FedAvgM(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
-                server_momentum=self.server_momentum,
-                momentum_factor=self.federated_args['momentum_factor']
+                round_idx=round_idx,
+                momentum_factor=self.federated_args['momentum_factor'],
+                tau=self.federated_args['tau']
             )
         # elif self.aggregation_strategy == "FedAdagrad":
         #     global_state_dict, self.server_velocity = FedAdagrad(

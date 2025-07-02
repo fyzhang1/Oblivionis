@@ -51,52 +51,82 @@ def FedProx(client_state_dicts, global_model_state_dict=None, mu=0.01):
     return FedAvg(client_state_dicts, global_model_state_dict)
 
 
-def FedAvgM(client_state_dicts: List[Dict], global_model_state_dict: Dict,
-                        server_momentum: Dict = None, momentum_factor: float = 0.9) -> Tuple[Dict, Dict]:
-    """
-    执行FedAvgM策略的模型参数聚合 - 带动量的联邦平均
+# def FedAvgM(client_state_dicts: List[Dict], global_model_state_dict: Dict,
+#                         server_momentum: Dict = None, momentum_factor: float = 0.9) -> Tuple[Dict, Dict]:
+#     """
+#     执行FedAvgM策略的模型参数聚合 - 带动量的联邦平均
     
-    Args:
-        client_state_dicts: 客户端模型状态字典列表
-        global_model_state_dict: 全局模型状态字典
-        server_momentum: 服务器动量状态字典
-        momentum_factor: 动量因子
+#     Args:
+#         client_state_dicts: 客户端模型状态字典列表
+#         global_model_state_dict: 全局模型状态字典
+#         server_momentum: 服务器动量状态字典
+#         momentum_factor: 动量因子
         
-    Returns:
-        (全局聚合后的状态字典, 更新后的服务器动量)
-    """
-    # 1. 计算当前轮次的模型参数平均值
-    avg_state_dict = FedAvg(client_state_dicts, global_model_state_dict)
+#     Returns:
+#         (全局聚合后的状态字典, 更新后的服务器动量)
+#     """
+#     # 1. 计算当前轮次的模型参数平均值
+#     avg_state_dict = FedAvg(client_state_dicts, global_model_state_dict)
     
-    # 2. 初始化动量状态字典
-    if server_momentum is None:
-        server_momentum = {}
-        for key, param in global_model_state_dict.items():
-            if isinstance(param, torch.Tensor):
-                server_momentum[key] = torch.zeros_like(param)
-            else:
-                server_momentum[key] = param
+#     # 2. 初始化动量状态字典
+#     if server_momentum is None:
+#         server_momentum = {}
+#         for key, param in global_model_state_dict.items():
+#             if isinstance(param, torch.Tensor):
+#                 server_momentum[key] = torch.zeros_like(param)
+#             else:
+#                 server_momentum[key] = param
     
-    # 3. 应用动量更新
-    new_global_state_dict = {}
-    new_server_momentum = {}
+#     # 3. 应用动量更新
+#     new_global_state_dict = {}
+#     new_server_momentum = {}
     
-    for key in global_model_state_dict.keys():
-        if isinstance(global_model_state_dict[key], torch.Tensor):
-            # 计算参数更新值
-            delta = avg_state_dict[key] - global_model_state_dict[key]
+#     for key in global_model_state_dict.keys():
+#         if isinstance(global_model_state_dict[key], torch.Tensor):
+#             # 计算参数更新值
+#             delta = avg_state_dict[key] - global_model_state_dict[key]
             
-            # 更新动量
-            new_server_momentum[key] = momentum_factor * server_momentum[key] + delta
+#             # 更新动量
+#             new_server_momentum[key] = momentum_factor * server_momentum[key] + delta
             
-            # 应用动量更新到全局模型
-            new_global_state_dict[key] = global_model_state_dict[key] + new_server_momentum[key]
-        else:
-            new_global_state_dict[key] = avg_state_dict[key]
-            new_server_momentum[key] = server_momentum[key]
+#             # 应用动量更新到全局模型
+#             new_global_state_dict[key] = global_model_state_dict[key] + new_server_momentum[key]
+#         else:
+#             new_global_state_dict[key] = avg_state_dict[key]
+#             new_server_momentum[key] = server_momentum[key]
     
-    return new_global_state_dict, new_server_momentum
+#     return new_global_state_dict, new_server_momentum
 
+
+def FedAvgM(client_state_dicts: List[Dict], global_model_state_dict: Dict, round_idx: int = 0, momentum_factor: float = 0.9, tau: float = 1e-3) -> Tuple[Dict, Dict]:
+#     """
+#     执行FedAvgM策略的模型参数聚合 - 带动量的联邦平均
+    
+#     Args:
+#         client_state_dicts: 客户端模型状态字典列表
+#         global_model_state_dict: 全局模型状态字典
+#         server_momentum: 服务器动量状态字典
+#         momentum_factor: 动量因子
+        
+#     Returns:
+#         (全局聚合后的状态字典, 更新后的服务器动量)
+#     """
+        # Momentum-based FedAvg
+        num_clients = len(client_state_dicts)
+        proxy_dict = {}
+        opt_proxy_dict = {}
+        for key in global_model_state_dict.keys():
+            proxy_dict[key] = torch.zeros_like(global_model_state_dict[key])
+            opt_proxy_dict[key] = torch.ones_like(global_model_state_dict[key]) * tau**2
+            
+        for key in global_model_state_dict.keys():
+            delta = sum([(client_state_dicts[c][key] - global_model_state_dict[key]) 
+                         for c in range(num_clients)]) / num_clients
+            
+            proxy_dict[key] = momentum_factor * proxy_dict[key] + (1 - momentum_factor) * delta if round_idx > 0 else delta
+            global_model_state_dict[key] = global_model_state_dict[key] + proxy_dict[key]
+        
+        return global_model_state_dict
 
 # def FedAdagrad(client_state_dicts: List[Dict], global_model_state_dict: Dict,
 #                           server_velocity: Dict = None, learning_rate: float = 0.1, 
