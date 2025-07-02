@@ -1,7 +1,7 @@
 # @package _global_
 
 defaults:
-  - override /model: Llama-3.2-3B-Instruct
+  - override /model: Llama-3.2-3B-Instruct-lora
   - override /trainer: GradAscent
   - override /data: unlearn
   - override /data/datasets@data.forget: TOFU_QA_forget
@@ -42,7 +42,7 @@ trainer:
     warmup_epochs: 1.0 # custom parameter
     learning_rate: 8e-5
     weight_decay: 0.01
-    num_train_epochs: 2
+    num_train_epochs: 10
     # save_strategy: steps
     # save_steps: 0.5
 
