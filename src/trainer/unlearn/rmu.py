@@ -4,7 +4,7 @@ import re
 import torch
 import deepspeed
 from trainer.unlearn.grad_diff import GradDiff
-
+from peft import PeftModel
 
 class RMU(GradDiff):
     def __init__(
@@ -26,7 +26,11 @@ class RMU(GradDiff):
 
         # Create reference model if not already set
         if self.ref_model is None:
+            print("Creating reference model...")
             self.ref_model = self._prepare_ref_model(self.model)
+            # 将参考模型移到CPU以节省GPU内存
+            print("Moving reference model to CPU to save GPU memory...")
+            self.ref_model = self.ref_model.cpu()
 
         # Unfreeze only the selected parameters
         self.trainable_params_regex = (
@@ -48,25 +52,45 @@ class RMU(GradDiff):
         self._freeze_all_params(self.model, True)
 
     def _get_matching_module(self, model, module_regex):
-        """Returns a single module matching the given regex from a DeepSpeed/DDP-wrapped model."""
-        # Handle DeepSpeed and DDP-wrapped models by accessing the underlying module
-        if isinstance(model, deepspeed.DeepSpeedEngine):
-            model = model.module  # Extract the actual PyTorch model inside
+        # print("Available modules:")
+        # for name, module in model.named_modules():
+        #     print(f"  {name}")
+        # Check if the model is a LoRA model
+        is_lora_model = isinstance(model, PeftModel) or any(".lora_" in name for name, _ in model.named_modules())
+        print(f"Model is {'a LoRA model' if is_lora_model else 'not a LoRA model'}")
+        
+        # 使用 re.search 查找匹配的模块
+        for name, module in model.named_modules():
+            name = name.replace(".default", "")
+            if re.search(module_regex, name):
+                print(f"Found matching module: {name}")
+                return module
+        
+        # 如果没有匹配，抛出详细错误信息
+        raise ValueError(f"No module matched with {module_regex}. Available modules printed above.")
 
-        matched_modules = {
-            name: module
-            for name, module in model.named_modules()
-            if re.fullmatch(module_regex, name)
-        }
+    # def _get_matching_module(self, model, module_regex):
+    #     """Returns a single module matching the given regex from a DeepSpeed/DDP-wrapped model."""
+    #     # Handle DeepSpeed and DDP-wrapped models by accessing the underlying module
+    #     if isinstance(model, deepspeed.DeepSpeedEngine):
+    #         model = model.module  # Extract the actual PyTorch model inside
 
-        if len(matched_modules) > 1:
-            raise ValueError(
-                f"More than one module matched with {module_regex}: {list(matched_modules.keys())}"
-            )
-        elif not matched_modules:
-            raise ValueError(f"No module matched with {module_regex}")
+    #     matched_modules = {
+    #         name: module
+    #         for name, module in model.named_modules()
+    #         if re.fullmatch(module_regex, name)
+    #     }
 
-        return next(iter(matched_modules.values()))  # Return the single matched module
+
+
+    #     if len(matched_modules) > 1:
+    #         raise ValueError(
+    #             f"More than one module matched with {module_regex}: {list(matched_modules.keys())}"
+    #         )
+    #     elif not matched_modules:
+    #         raise ValueError(f"No module matched with {module_regex}")
+
+    #     return next(iter(matched_modules.values()))  # Return the single matched module
 
     def _freeze_all_params(self, model, requires_grad=True):
         """Freeze all parameters in the model initially."""
@@ -123,9 +147,19 @@ class RMU(GradDiff):
             model_retain_activations, _ = self.forward_with_cache(
                 model, retain_inputs, module=self.model_module, no_grad=False
             )
+            
+            # 临时将参考模型移到GPU进行计算
+            device = model_retain_activations.device
+            self.ref_model = self.ref_model.to(device)
+            
             ref_retain_activations, _ = self.forward_with_cache(
                 self.ref_model, retain_inputs, module=self.ref_module, no_grad=True
             )
+            
+            # 立即将参考模型移回CPU
+            self.ref_model = self.ref_model.cpu()
+            torch.cuda.empty_cache()  # 清理GPU缓存
+            
             mask = retain_inputs["labels"] != -100  # Shape: [b, s]
             retain_loss = self.compute_activation_loss(
                 model_retain_activations,
@@ -137,12 +171,12 @@ class RMU(GradDiff):
         return retain_loss
 
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
-        forget_inputs = inputs["forget"]
-        forget_inputs = forget_inputs["forget"]
+        forget = inputs["forget"]
+        forget = forget["forget"]
         forget_inputs = {
-            "input_ids": forget_inputs["input_ids"],
-            "attention_mask": forget_inputs["attention_mask"],
-            "labels": forget_inputs["labels"],
+            "input_ids": forget["input_ids"],
+            "attention_mask": forget["attention_mask"],
+            "labels": forget["labels"],
         }
 
         model_forget_activations, forget_outputs = self.forward_with_cache(
@@ -161,12 +195,12 @@ class RMU(GradDiff):
             model_forget_activations, control_vec, mask
         )
 
-        retain_inputs = inputs["retain"]
-        retain_inputs = retain_inputs["retain"]
+        retain = inputs["retain"]
+        retain = retain["retain"]
         retain_inputs = {
-            "input_ids": retain_inputs["input_ids"],
-            "attention_mask": retain_inputs["attention_mask"],
-            "labels": retain_inputs["labels"],
+            "input_ids": retain["input_ids"],
+            "attention_mask": retain["attention_mask"],
+            "labels": retain["labels"],
         }
         retain_loss = self.compute_retain_loss(model=model, retain_inputs=retain_inputs)
 

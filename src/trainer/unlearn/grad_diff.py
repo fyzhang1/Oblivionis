@@ -1,6 +1,9 @@
 import copy
 from trainer.utils import compute_kl_divergence
 from trainer.unlearn.base import UnlearnTrainer
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class GradDiff(UnlearnTrainer):
@@ -40,23 +43,26 @@ class GradDiff(UnlearnTrainer):
 
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
 
-        forget_inputs = inputs["forget"]
-        forget_inputs = forget_inputs["forget"]
+        # logger.info(f"inputs: {inputs}")
+        forget = inputs["forget"]
+        forget = forget["forget"]
+        # forget_inputs = inputs["forget"]
+        # forget_inputs = forget_inputs["forget"]
         forget_inputs = {
-            "input_ids": forget_inputs["input_ids"],
-            "attention_mask": forget_inputs["attention_mask"],
-            "labels": forget_inputs["labels"],
+            "input_ids": forget["input_ids"],
+            "attention_mask": forget["attention_mask"],
+            "labels": forget["labels"],
         }
 
         forget_outputs = model(**forget_inputs)
         forget_loss = -forget_outputs.loss
 
-        retain_inputs = inputs["retain"]
-        retain_inputs = retain_inputs["retain"]
+        retain = inputs["retain"]
+        retain = retain["retain"]
         retain_inputs = {
-            "input_ids": retain_inputs["input_ids"],
-            "attention_mask": retain_inputs["attention_mask"],
-            "labels": retain_inputs["labels"],
+            "input_ids": retain["input_ids"],
+            "attention_mask": retain["attention_mask"],
+            "labels": retain["labels"],
         }
         retain_loss = self.compute_retain_loss(model=model, retain_inputs=retain_inputs)
 

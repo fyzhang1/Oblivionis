@@ -32,17 +32,23 @@ class ForgetRetainDataset(Dataset):
             raise NotImplementedError(f"{self.anchor} can be only forget or retain")
 
     def __getitem__(self, idx):
-        """Returns the item from the anchor dataset.
-        
-        Returns:
-            dict: A dictionary containing the input_ids, attention_mask, and labels.
-        """
+
+        item = {}
         if self.anchor == "forget":
-            return self.forget[idx]
+            item["forget"] = self.forget[idx]
+            if self.retain:
+                retain_idx = torch.randint(0, len(self.retain), (1,)).item()
+                item["retain"] = self.retain[retain_idx]
+            # return self.forget[idx]
         elif self.anchor == "retain":
-            return self.retain[idx]
-        else:
-            raise NotImplementedError(f"{self.anchor} can be only forget or retain")
+            item["retain"] = self.retain[idx]
+            if self.forget:
+                forget_idx = torch.randint(0, len(self.forget), (1,)).item()
+                item["forget"] = self.forget[forget_idx]
+        return item
+        #     return self.retain[idx]
+        # else:
+        #     raise NotImplementedError(f"{self.anchor} can be only forget or retain")
 
 def get_federated_data(forget_dataset, retain_dataset, num_clients, target_client_idx):
     """

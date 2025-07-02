@@ -155,13 +155,34 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
     def unlearn_client_model(self, client_model, client_dataset):
         from trainer import TRAINER_REGISTRY
         trainer_cls = TRAINER_REGISTRY.get(self.unlearn_trainer_cls, None)
-        
+
+
         forget_dataset = client_dataset.forget
         retain_dataset = client_dataset.retain
-        
+
+
         logger.info(f"forget_data length: {len(forget_dataset)}")
-        logger.info(f"retain_data length: {len(retain_dataset)}")
+        logger.info(f"retain_data length: {len(retain_dataset.retain)}")
         logger.info(f"Unlearning_cls_name: {self.unlearn_trainer_cls}")
+        
+        class CombinedDataset(Dataset):
+            def __init__(self, forget_data, retain_data):
+                self.forget_data = forget_data
+                self.retain_data = retain_data
+                self.retain_length = len(retain_data)
+
+            def __len__(self):
+                return len(self.forget_data)
+
+            def __getitem__(self, idx):
+                # 对retain数据集进行循环索引
+                retain_idx = idx % self.retain_length
+                return {
+                    "forget": self.forget_data[idx],
+                    "retain": self.retain_data[retain_idx]
+                }
+        
+        combined_dataset = CombinedDataset(forget_dataset, retain_dataset)
 
         if self.aggregation_strategy == "FedProx":
             class FedProxUnlearnTrainer(trainer_cls):
@@ -195,7 +216,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             
             unlearn_trainer = FedProxUnlearnTrainer(
                 model=client_model,
-                train_dataset=forget_dataset,
+                train_dataset=combined_dataset,
                 tokenizer=self.tokenizer,
                 data_collator=self.data_collator,
                 args=self.args,
@@ -208,7 +229,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         else:
             unlearn_trainer = trainer_cls(
                 model=client_model,
-                train_dataset=forget_dataset,
+                train_dataset=combined_dataset,
                 tokenizer=self.tokenizer,
                 data_collator=self.data_collator,
                 args=self.args,

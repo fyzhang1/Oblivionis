@@ -20,11 +20,14 @@ class GradAscent(UnlearnTrainer):
         Compute loss for gradient ascent (unlearning).
         Expects inputs to be a dict with 'input_ids', 'labels', 'attention_mask'.
         """
+
+        forget = inputs["forget"]
+        forget = forget["forget"]
         # Directly use input data since ForgetRetainDataset now returns the required data format
         forget_inputs = {
-            "input_ids": inputs["input_ids"],
-            "attention_mask": inputs["attention_mask"],
-            "labels": inputs.get("labels", None),  # labels 可能为 None
+            "input_ids": forget["input_ids"],
+            "attention_mask": forget["attention_mask"],
+            "labels": forget.get("labels", None),  # labels 可能为 None
         }
         
         # Call model to compute outputs
