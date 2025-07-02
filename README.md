@@ -12,14 +12,17 @@ We aim to construct the Federated LLM Unlearning: A unified framework for buildi
 - Multiple unlearning and federated unlearning algorithms
 ---------
 # 🏁 Quick Start
-##  🧩 TOFU federated Finetune
+##  🧩 LoRA Federated Finetune (TOFU)
 ```python
-python src/fed_train.py --config-name=train.yaml \experiment=finetune/tofu/default \task_name=fed_TRAIN_3b \model=Llama-3.2-3B-Instruct
+python src/federated_train.py \
+--config-name=train-lora.yaml \
+experiment=finetune/tofu/default \
+task_name=FedProx_LoRA_Finetune_llama3b
 ```
+`task_name={fed}_LoRA+{Finetune\Unlearn name}_{model}`
 
-```python
-The fine-tune model (initial global model) is saved: "saves/finetune/{task_name}"
-```
+`The fine-tune model (initial global model) is saved: "saves/finetune/{task_name}"`
+
 
 ##  🪭TOFU Unlearning
 
@@ -84,10 +87,10 @@ model_args:
   torch_dtype: bfloat16
   use_lora: true
   lora_config:
-    r: 16                    # LoRA rank
-    lora_alpha: 32          # LoRA alpha参数
+    r: 32                    # LoRA rank
+    lora_alpha: 64          # LoRA alpha参数
     target_modules: ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-    lora_dropout: 0.1       # LoRA dropout率
+    lora_dropout: 0.05       # LoRA dropout率
     bias: "none"            # bias处理方式
 ```
 

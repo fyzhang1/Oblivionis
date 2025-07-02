@@ -70,8 +70,8 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             'server_lr': kwargs.get('server_lr', 1.0),
             'beta1': kwargs.get('beta1', 0.9),
             'beta2': kwargs.get('beta2', 0.99),
-            'epsilon': kwargs.get('epsilon', 1e-8),
-            'tau': kwargs.get('tau', 0.0),
+            'epsilon': kwargs.get('epsilon', 1e-3),
+            'tau': kwargs.get('tau', 1e-3),
             'mu': kwargs.get('mu', 0.01),
             'momentum_factor': kwargs.get('momentum_factor', 0.9)
         }
@@ -169,20 +169,27 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                     super().__init__(*args, **kwargs)
                     self.global_model = global_model.to(self.args.device) if global_model is not None else None
                     self.mu = mu
-                
-                def compute_loss(self, model, inputs, return_outputs=False):
-                    # 获取原始损失
-                    loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
+
+                def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+                    return_values = super().compute_loss(model, inputs, return_outputs=return_outputs)
                     
-                    # 添加FedProx正则项
+                    if return_outputs:
+                        loss, outputs = return_values
+                    else:
+                        loss = return_values
+
                     proximal_term = 0.0
                     if self.global_model is not None:
-                        for w, w_t in zip(model.parameters(), self.global_model.parameters()):
-                            if w.requires_grad:
-                                proximal_term += torch.norm(w - w_t.detach()) ** 2
-                        
-                        proximal_term = (self.mu / 2) * proximal_term
-                        loss += proximal_term
+                        global_state = get_peft_model_state_dict(self.global_model)
+                        for name, w in model.named_parameters():
+                            if not w.requires_grad:
+                                continue
+                            name = name.replace(".default", "") 
+                            if name not in global_state:
+                                logger.warning(f"Parameter {name} not found in global_state, skipping")
+                                continue
+                            proximal_term += torch.norm(w - global_state[name].to(w.device).detach()) ** 2
+                        loss += (self.mu / 2) * proximal_term
                     
                     return (loss, outputs) if return_outputs else loss
             
@@ -223,23 +230,29 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         if self.aggregation_strategy == "FedProx":
             class FedProxTrainer(FinetuneTrainer):
                 def __init__(self, *args, global_model=None, mu=0.01, **kwargs):
-                    super().__init__(*args, **kwargs)
-                    self.global_model = global_model.to(self.args.device) if global_model is not None else None
+                    super(FedProxTrainer, self).__init__(*args, **kwargs)
+                    self.global_model = global_model
                     self.mu = mu
-                
-                def compute_loss(self, model, inputs, return_outputs=False):
-                    outputs = model(**inputs)
-                    loss = outputs.loss
                     
+                def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+                    return_values = super().compute_loss(model, inputs, return_outputs=return_outputs)
+                    
+                    if return_outputs:
+                        loss, outputs = return_values
+                    else:
+                        loss = return_values
                     proximal_term = 0.0
                     if self.global_model is not None:
-                        for w, w_t in zip(model.parameters(), self.global_model.parameters()):
-                            if w.requires_grad:
-                                proximal_term += torch.norm(w - w_t.detach()) ** 2
-                                
-                        proximal_term = (self.mu / 2) * proximal_term
-                        loss += proximal_term
-                        
+                        global_state = get_peft_model_state_dict(self.global_model)
+                        for name, w in model.named_parameters():
+                            if not w.requires_grad:
+                                continue
+                            name = name.replace(".default", "") 
+                            if name not in global_state:
+                                logger.warning(f"Parameter {name} not found in global_state, skipping")
+                                continue
+                            proximal_term += torch.norm(w - global_state[name].to(w.device).detach()) ** 2
+                        loss += (self.mu / 2) * proximal_term                    
                     return (loss, outputs) if return_outputs else loss
                 
             trainer = FedProxTrainer(

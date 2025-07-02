@@ -63,8 +63,8 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
             'server_lr': kwargs.get('server_lr', 1.0),
             'beta1': kwargs.get('beta1', 0.9),
             'beta2': kwargs.get('beta2', 0.99),
-            'epsilon': kwargs.get('epsilon', 1e-8),
-            'tau': kwargs.get('tau', 0.0),
+            'epsilon': kwargs.get('epsilon', 1e-3),
+            'tau': kwargs.get('tau', 1e-3),
             'mu': kwargs.get('mu', 0.01),
             'momentum_factor': kwargs.get('momentum_factor', 0.9)
         }
@@ -118,7 +118,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                 # self.trained_client_indices.append(client_idx)
             
             # 聚合模型 - 结果已经直接更新到self.model
-            self.aggregate_models()
+            self.aggregate_models(round_idx)
             logger.info(f"Completed global round {round_idx + 1}/{self.global_rounds}")
             
             # 保存状态
@@ -135,25 +135,38 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
     def train_client_model(self, client_model, client_dataset):
         """训练单个客户端模型"""
         if self.aggregation_strategy == "FedProx":
+            
             class FedProxTrainer(FinetuneTrainer):
                 def __init__(self, *args, global_model=None, mu=0.01, **kwargs):
-                    super().__init__(*args, **kwargs)
-                    self.global_model = global_model.to(self.args.device) if global_model is not None else None
+                    super(FedProxTrainer, self).__init__(*args, **kwargs)
+                    self.global_model = global_model
                     self.mu = mu
-                
-                def compute_loss(self, model, inputs, return_outputs=False):
-                    outputs = model(**inputs)
-                    loss = outputs.loss
                     
+                def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+                    return_values = super().compute_loss(model, inputs, return_outputs=return_outputs)
+                    
+                    if return_outputs:
+                        loss, outputs = return_values
+                    else:
+                        loss = return_values
+
                     proximal_term = 0.0
                     if self.global_model is not None:
-                        # FedProx的近端项应该只计算在可训练的参数上
-                        for (name, w), (global_name, w_t) in zip(model.named_parameters(), self.global_model.named_parameters()):
-                            if w.requires_grad:
-                                proximal_term += torch.sum(torch.pow(w - w_t.to(w.device).detach(), 2))
-                                
-                        loss += (self.mu / 2) * proximal_term
+                        global_state = get_peft_model_state_dict(self.global_model)
+                        for name, w in model.named_parameters():
+                            if not w.requires_grad:
+                                continue
+                            name = name.replace(".default", "")  # 适配 PEFT
+                            if name not in global_state:
+                                logger.warning(f"Parameter {name} not found in global_state, skipping")
+                                continue
+                            # 只累加proximal term，不要在循环内修改loss
+                            proximal_term += torch.norm(w - global_state[name].to(w.device).detach()) ** 2
                         
+                        # 在循环外统一添加proximal term到loss
+                        loss += (self.mu / 2) * proximal_term
+                        # logger.info(f"FedProx loss: {loss.item()}, proximal_term: {proximal_term.item()}")
+                    
                     return (loss, outputs) if return_outputs else loss
                 
             trainer = FedProxTrainer(
@@ -185,7 +198,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         trained_model = trainer.model.cpu()
         return trained_model
 
-    def aggregate_models(self):
+    def aggregate_models(self, round_idx=0):
         """聚合所有客户端模型"""
         logger.info("Aggregating client models")
         
@@ -229,44 +242,59 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
                 server_momentum=self.server_momentum,
                 momentum_factor=self.federated_args['momentum_factor']
             )
+        # elif self.aggregation_strategy == "FedAdagrad":
+        #     global_state_dict, self.server_velocity = FedAdagrad(
+        #         client_state_dicts,
+        #         global_model_state_dict=global_peft_state_dict,
+        #         server_velocity=self.server_velocity,
+        #         learning_rate=self.federated_args['server_lr'],
+        #         epsilon=self.federated_args['epsilon'],
+        #         tau=self.federated_args['tau']
+        #     )
         elif self.aggregation_strategy == "FedAdagrad":
-            global_state_dict, self.server_velocity = FedAdagrad(
+            global_state_dict = FedAdagrad(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
-                server_velocity=self.server_velocity,
-                learning_rate=self.federated_args['server_lr'],
                 epsilon=self.federated_args['epsilon'],
                 tau=self.federated_args['tau']
             )
+        # elif self.aggregation_strategy == "FedYogi":
+        #     global_state_dict, self.server_velocity, self.server_momentum = FedYogi(
+        #         client_state_dicts,
+        #         global_model_state_dict=global_peft_state_dict,
+        #         server_velocity=self.server_velocity,
+        #         server_momentum=self.server_momentum,
+        #         learning_rate=self.federated_args['server_lr'],
+        #         beta1=self.federated_args['beta1'],
+        #         beta2=self.federated_args['beta2'],
+        #         epsilon=self.federated_args['epsilon'],
+        #         tau=self.federated_args['tau']
+        #     )
         elif self.aggregation_strategy == "FedYogi":
-            global_state_dict, self.server_velocity, self.server_momentum = FedYogi(
+            global_state_dict = FedYogi(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
-                server_velocity=self.server_velocity,
-                server_momentum=self.server_momentum,
-                learning_rate=self.federated_args['server_lr'],
+                round_idx=round_idx,
                 beta1=self.federated_args['beta1'],
                 beta2=self.federated_args['beta2'],
                 epsilon=self.federated_args['epsilon'],
                 tau=self.federated_args['tau']
             )
         elif self.aggregation_strategy == "FedAdam":
-            global_state_dict, self.server_velocity, self.server_momentum = FedAdam(
+            global_state_dict = FedAdam(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
-                server_velocity=self.server_velocity,
-                server_momentum=self.server_momentum,
-                learning_rate=self.federated_args['server_lr'],
+                round_idx=round_idx,
                 beta1=self.federated_args['beta1'],
                 beta2=self.federated_args['beta2'],
                 epsilon=self.federated_args['epsilon'],
                 tau=self.federated_args['tau']
             )
         elif self.aggregation_strategy == "FedProx":
-            global_state_dict = FedProx(
+            # FedProx的聚合与FedAvg相同
+            global_state_dict = FedAvg(
                 client_state_dicts,
-                global_model_state_dict=global_peft_state_dict,
-                mu=self.federated_args['mu']
+                global_model_state_dict=global_peft_state_dict
             )
         
         if self.is_peft:
@@ -278,6 +306,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
             self.model.load_state_dict(global_state_dict)
             
         logger.info("Global model updated")
+
 
     def save_model(self, output_dir=None):
         """保存模型，支持PEFT模型"""

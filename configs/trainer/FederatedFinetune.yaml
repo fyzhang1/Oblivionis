@@ -1,15 +1,15 @@
 handler: FederatedFinetuneTrainer
 method_args:
   num_clients: 3  # Total number of clients in federated learning
-  aggregation_strategy: "FedAvg"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
+  aggregation_strategy: "FedProx"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
   global_rounds: 10  # 全局训练轮数设置
 
 args:
   output_dir: saves/finetune/${task_name}
   logging_dir: ${trainer.args.output_dir}/logs
-  per_device_train_batch_size: 4  # 减少批次大小，降低内存占用
+  per_device_train_batch_size: 32  # 减少批次大小，降低内存占用
   per_device_eval_batch_size: 8   # 减少评估批次大小
-  gradient_accumulation_steps: 8  # 增加梯度累积步数，保持有效批次大小
+  gradient_accumulation_steps: 1  # 增加梯度累积步数，保持有效批次大小
   learning_rate: 8e-5
   bf16: True
   bf16_full_eval: True
