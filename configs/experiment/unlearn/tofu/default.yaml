@@ -1,7 +1,7 @@
 # @package _global_
 
 defaults:
-  - override /model: Llama-3.2-3B-Instruct-lora
+  - override /model: Llama-3.2-1B-Instruct-lora
   - override /trainer: GradAscent
   - override /data: unlearn
   - override /data/datasets@data.forget: TOFU_QA_forget
