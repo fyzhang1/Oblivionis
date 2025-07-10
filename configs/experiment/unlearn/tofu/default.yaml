@@ -12,9 +12,9 @@ model:
   model_args:
     pretrained_model_name_or_path: saves/finetune/fed_lora_finetune
 
-forget_split: forget10
-retain_split: retain90
-holdout_split: holdout10
+forget_split: forget05
+retain_split: retain95
+holdout_split: holdout05
 retain_logs_path: null
 
 eval:

@@ -12,7 +12,8 @@ datasets: ${paths.root_dir}/configs/data/datasets
 # use it to store all files generated during the run, like ckpts and metrics
 # save_dir: ${paths.root_dir}/saves/${mode}/${task_name}
 
-output_dir: ${paths.root_dir}/saves/${mode}/${task_name}
+# output_dir: ${paths.root_dir}/saves/${mode}/${task_name}
+output_dir: ${paths.root_dir}/saves/${task_name}
 
 # path to working directory
 work_dir: ${hydra:runtime.cwd}

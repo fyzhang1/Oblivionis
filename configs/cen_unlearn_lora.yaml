@@ -1,13 +1,17 @@
 defaults:
-  - _self_
   - model: Llama-3.2-1B-Instruct-lora
-  - trainer: finetune 
-  - data: finetune
+  - trainer: Gradscent
+  - data: unlearn
   - collator: DataCollatorForSupervisedDataset
   - eval: tofu
   - hydra: default
   - paths: default
   - experiment: null
+  - _self_
 
-mode: train
-task_name: ???
+trainer:
+  args: 
+    remove_unused_columns: False
+
+mode: unlearn
+task_name: ??? 

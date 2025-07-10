@@ -2,7 +2,7 @@ handler: FederatedUnlearningTrainer
 method_args:
   num_clients: 3
   target_client_idx: 0
-  unlearn_trainer_cls: "GradAscent"  # 可以是GradAscent, GradDiff, NPO, SimNPO, RMU
+  unlearn_trainer_cls: "GradAscent"
   aggregation_strategy: "FedAvg"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
   global_rounds: 2  # 全局训练轮数设置
 
