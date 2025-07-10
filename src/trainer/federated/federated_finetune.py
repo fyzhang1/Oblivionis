@@ -50,13 +50,28 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         self.aggregation_strategy = aggregation_strategy
         self.global_rounds = global_rounds
         self.client_models = []
+        self.client_data_sizes = []  # 记录每个客户端的样本量
         self.kwargs = kwargs
         
         # 检测是否为PEFT模型
         self.is_peft = isinstance(self.model, PeftModel)
 
-        self.server_momentum = None  # 用于FedAvgM、FedAdam、FedYogi
-        self.server_velocity = None  # 用于FedAdagrad、FedAdam、FedYogi
+        # self.server_momentum = None  # 用于FedAvgM、FedAdam、FedYogi
+        # self.server_velocity = None  # 用于FedAdagrad、FedAdam、FedYogi
+        
+        # FedAdam专用的动量状态
+        self.fedadam_momentum = None   # FedAdam的一阶动量
+        self.fedadam_velocity = None   # FedAdam的二阶动量
+        
+        # FedYogi专用的动量状态
+        self.fedyogi_momentum = None   # FedYogi的一阶动量
+        self.fedyogi_velocity = None   # FedYogi的二阶动量
+        
+        # FedAvgM专用的动量状态
+        self.fedavgm_momentum = None   # FedAvgM的动量状态
+        
+        # FedAdagrad专用的累积状态
+        self.fedadagrad_velocity = None  # FedAdagrad的累积梯度平方和
         
         # 为算法特定参数设置默认值
         self.federated_args = {
@@ -78,7 +93,6 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         
         logger.info(f"Initialized with {num_clients} clients, global rounds: {global_rounds}")
         logger.info(f"Model type - PEFT: {self.is_peft}")
-    
 
     def train(self, **kwargs):
         """执行联邦学习训练过程"""
@@ -92,6 +106,7 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
             
             # 在CPU上初始化客户端模型
             self.client_models = [deepcopy(self.model) for _ in range(self.num_clients)]
+            self.client_data_sizes = []  # 重置每轮的样本量记录
 
             # 训练客户端模型
             logger.info(f"Aggregation strategy: {self.aggregation_strategy}")
@@ -99,13 +114,18 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
             for client_idx in range(self.num_clients):
                 if client_idx not in self.federated_dataset:
                     logger.warning(f"Skipping client {client_idx} as no data is available")
+                    self.client_data_sizes.append(0)  # 记录样本量为0
                     continue
                     
                 client_model = self.client_models[client_idx]
                 client_dataset = self.federated_dataset[client_idx]
                 
+                # 记录客户端样本量
+                client_data_size = len(client_dataset)
+                self.client_data_sizes.append(client_data_size)
+                
                 logger.info(f"Training on client {client_idx}")
-                logger.info(f"Client {client_idx} dataset size: {len(client_dataset)} samples")
+                logger.info(f"Client {client_idx} dataset size: {client_data_size} samples")
                 logger.info(f"Training args - Batch size: {self.args.per_device_train_batch_size}, Epochs: {self.args.num_train_epochs}")
                 if hasattr(self.args, 'max_steps') and self.args.max_steps > 0:
                     logger.info(f"Max steps limit: {self.args.max_steps}")
@@ -202,6 +222,16 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         """聚合所有客户端模型"""
         logger.info("Aggregating client models")
         
+        # 计算基于样本量的权重
+        total_samples = sum(self.client_data_sizes)
+        if total_samples == 0:
+            logger.warning("No samples available for aggregation")
+            return
+            
+        client_weights = [size / total_samples for size in self.client_data_sizes]
+        logger.info(f"Client sample sizes: {self.client_data_sizes}")
+        logger.info(f"Client weights: {[f'{w:.4f}' for w in client_weights]}")
+        
         if self.is_peft:
             # 对于PEFT模型，只聚合可训练的参数（LoRA权重）
             client_state_dicts = []
@@ -233,69 +263,61 @@ class FederatedFinetuneTrainer(FinetuneTrainer):
         if self.aggregation_strategy == "FedAvg":
             global_state_dict = FedAvg(
                 client_state_dicts, 
-                global_model_state_dict=global_peft_state_dict
+                global_model_state_dict=global_peft_state_dict,
+                client_weights=client_weights
             )
         elif self.aggregation_strategy == "FedAvgM":
-            global_state_dict = FedAvgM(
+            global_state_dict, self.fedavgm_momentum = FedAvgM(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
+                proxy_dict=self.fedavgm_momentum,
                 round_idx=round_idx,
                 momentum_factor=self.federated_args['momentum_factor'],
-                tau=self.federated_args['tau']
+                tau=self.federated_args['tau'],
+                client_weights=client_weights
             )
-        # elif self.aggregation_strategy == "FedAdagrad":
-        #     global_state_dict, self.server_velocity = FedAdagrad(
-        #         client_state_dicts,
-        #         global_model_state_dict=global_peft_state_dict,
-        #         server_velocity=self.server_velocity,
-        #         learning_rate=self.federated_args['server_lr'],
-        #         epsilon=self.federated_args['epsilon'],
-        #         tau=self.federated_args['tau']
-        #     )
         elif self.aggregation_strategy == "FedAdagrad":
-            global_state_dict = FedAdagrad(
+            global_state_dict, self.fedadagrad_velocity = FedAdagrad(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
+                server_velocity=self.fedadagrad_velocity,
                 epsilon=self.federated_args['epsilon'],
-                tau=self.federated_args['tau']
+                tau=self.federated_args['tau'],
+                client_weights=client_weights
             )
-        # elif self.aggregation_strategy == "FedYogi":
-        #     global_state_dict, self.server_velocity, self.server_momentum = FedYogi(
-        #         client_state_dicts,
-        #         global_model_state_dict=global_peft_state_dict,
-        #         server_velocity=self.server_velocity,
-        #         server_momentum=self.server_momentum,
-        #         learning_rate=self.federated_args['server_lr'],
-        #         beta1=self.federated_args['beta1'],
-        #         beta2=self.federated_args['beta2'],
-        #         epsilon=self.federated_args['epsilon'],
-        #         tau=self.federated_args['tau']
-        #     )
         elif self.aggregation_strategy == "FedYogi":
-            global_state_dict = FedYogi(
+            global_state_dict, self.fedyogi_momentum, self.fedyogi_velocity = FedYogi(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
+                proxy_dict=self.fedyogi_momentum,
+                opt_proxy_dict=self.fedyogi_velocity,
                 round_idx=round_idx,
                 beta1=self.federated_args['beta1'],
                 beta2=self.federated_args['beta2'],
                 epsilon=self.federated_args['epsilon'],
-                tau=self.federated_args['tau']
+                tau=self.federated_args['tau'],
+                client_weights=client_weights
             )
         elif self.aggregation_strategy == "FedAdam":
-            global_state_dict = FedAdam(
+            global_state_dict, self.fedadam_momentum, self.fedadam_velocity = FedAdam(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
+                proxy_dict=self.fedadam_momentum,
+                opt_proxy_dict=self.fedadam_velocity,
                 round_idx=round_idx,
                 beta1=self.federated_args['beta1'],
                 beta2=self.federated_args['beta2'],
                 epsilon=self.federated_args['epsilon'],
-                tau=self.federated_args['tau']
+                tau=self.federated_args['tau'],
+                client_weights=client_weights
             )
+
         elif self.aggregation_strategy == "FedProx":
-            # FedProx的聚合与FedAvg相同
+            # FedProx的聚合与FedAvg相同，使用样本量权重
             global_state_dict = FedAvg(
                 client_state_dicts,
-                global_model_state_dict=global_peft_state_dict
+                global_model_state_dict=global_peft_state_dict,
+                client_weights=client_weights
             )
         
         if self.is_peft:
