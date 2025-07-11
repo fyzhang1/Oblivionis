@@ -17,9 +17,11 @@ Model_Size="1B"
 mkdir -p logs/retain/eval
 mkdir -p logs/finetune/eval
 mkdir -p logs/unlearn/eval
+
 mkdir -p saves/retain
 mkdir -p saves/finetune
 mkdir -p saves/unlearn
+mkdir -p saves/eval
 
 # ========================================
 #           运行前提示
@@ -169,6 +171,7 @@ for AfterUnlearn in "${unlearn_cls[@]}"; do
         retain_logs_path=saves/eval/${retain_task_name}/TOFU_EVAL.json \
         model.model_args.pretrained_model_name_or_path=saves/unlearn/${unlearn_task_name} \
         hydra.run.dir=saves/eval/${unlearn_task_name} \
+        paths.output_dir=saves/eval/${unlearn_task_name} \
         2>&1 | tee logs/unlearn/eval/${unlearn_task_name}.txt
 
       echo "[Step 6 ✅] Unlearn Eval 完成：$unlearn_task_name"

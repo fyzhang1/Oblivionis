@@ -432,4 +432,3 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             self.model.load_state_dict(global_state_dict)
 
         logger.info("Global model updated")
-
