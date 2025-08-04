@@ -2,13 +2,14 @@ handler: FederatedUnlearningTrainer
 method_args:
   num_clients: 3
   target_client_idx: 0
-  unlearn_trainer_cls: "GradAscent"
-  aggregation_strategy: "FedAvg"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
+  unlearn_trainer_cls: "SimNPO"
+  aggregation_strategy: "FedAdam"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
   global_rounds: 2  # 全局训练轮数设置
+  unlearn_epochs: 50  # unlearn阶段单独的epoch设置
 
 args:
   per_device_train_batch_size: 32
-  per_device_eval_batch_size: 8
+  per_device_eval_batch_size: 1
   gradient_accumulation_steps: 1
   learning_rate: 8e-5
   bf16: True
@@ -27,6 +28,6 @@ args:
   do_eval: False
   eval_on_start: False
   eval_strategy: 'no'
-  num_train_epochs: 10
+  num_train_epochs: 5  # finetune阶段的epoch设置
   seed: 0
 

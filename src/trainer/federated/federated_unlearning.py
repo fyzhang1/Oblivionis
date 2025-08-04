@@ -14,7 +14,7 @@ from peft import PeftModel, get_peft_model_state_dict, set_peft_model_state_dict
 logger = logging.getLogger(__name__)
 
 class FederatedUnlearningTrainer(FinetuneTrainer):
-    """联邦学习与遗忘训练器, 继承自FinetuneTrainer"""
+
     
     def __init__(
         self,
@@ -31,9 +31,10 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         unlearn_trainer_cls=None,
         aggregation_strategy="average",
         global_rounds=1,
+        unlearn_epochs=None,
         **kwargs
     ):
-        """初始化联邦学习与遗忘训练器"""
+
         self.federated_dataset = train_dataset if isinstance(train_dataset, dict) else None
         dummy_train_dataset = None
         if self.federated_dataset and 0 in self.federated_dataset:
@@ -57,31 +58,31 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         self.unlearn_trainer_cls = unlearn_trainer_cls
         self.aggregation_strategy = aggregation_strategy
         self.global_rounds = global_rounds
+        self.unlearn_epochs = unlearn_epochs  
         self.client_models = []
-        self.client_data_sizes = []  # 记录每个客户端的样本量
+        self.client_data_sizes = [] 
         self.kwargs = kwargs
         
-        # 检测是否为PEFT模型
+  
         self.is_peft = isinstance(self.model, PeftModel)
 
-        self.server_momentum = None  # 用于FedAvgM、FedAdam、FedYogi
-        self.server_velocity = None  # 用于FedAdagrad、FedAdam、FedYogi
+        self.server_momentum = None  
+        self.server_velocity = None  
         
-        # FedAdam专用的动量状态
-        self.fedadam_momentum = None   # FedAdam的一阶动量
-        self.fedadam_velocity = None   # FedAdam的二阶动量
         
-        # FedYogi专用的动量状态
-        self.fedyogi_momentum = None   # FedYogi的一阶动量
-        self.fedyogi_velocity = None   # FedYogi的二阶动量
+        self.fedadam_momentum = None  
+        self.fedadam_velocity = None   
+
+        self.fedyogi_momentum = None  
+        self.fedyogi_velocity = None   
         
-        # FedAvgM专用的动量状态
-        self.fedavgm_momentum = None   # FedAvgM的动量状态
+
+        self.fedavgm_momentum = None   
         
-        # FedAdagrad专用的累积状态
-        self.fedadagrad_velocity = None  # FedAdagrad的累积梯度平方和
+ 
+        self.fedadagrad_velocity = None  
         
-        # 为算法特定参数设置默认值
+
         self.federated_args = {
             'server_lr': kwargs.get('server_lr', 1.0),
             'beta1': kwargs.get('beta1', 0.9),
@@ -104,26 +105,25 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
 
 
     def train(self, resume_from_checkpoint=None, trial=None, **kwargs):
-        """执行联邦学习训练过程"""
         if not self.federated_dataset:
             raise ValueError("Federated dataset is not properly set up")
         
         logger.info(f"Starting federated unlearning training with {self.global_rounds} global rounds")
         
-        # 将全局模型移到CPU，以节省GPU内存
+     
         self.model = self.model.cpu()
         self.model = deepcopy(self.model)
         
 
-        # 步骤1: 目标客户端执行unlearning
+       
         logger.info(f"Step 1: Unlearning on target client {self.target_client_idx}")
         if self.target_client_idx in self.federated_dataset:
             target_dataset = self.federated_dataset[self.target_client_idx]
-            # 使用当前全局模型进行unlearning
+         
             self.unlearn_client_model(self.model, target_dataset)            
             
-            # 步骤2: 将unlearning后的模型设为新的全局模型
-            # self.model = self.model
+           
+         
             logger.info("Updated global model with unlearned model")
         else:
             logger.warning(f"Target client {self.target_client_idx} has no data, skipping unlearning")
@@ -131,46 +131,41 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         for round_idx in range(self.global_rounds):
             logger.info(f"Starting global round {round_idx + 1}/{self.global_rounds}")
             
-            # 步骤3: 所有客户端基于新全局模型在retain data上训练
+    
             logger.info("Step 2: All clients training on retain data with updated global model")
             
-            # 在CPU上初始化客户端模型（基于unlearning后的全局模型）
+         
             self.client_models = [deepcopy(self.model) for _ in range(self.num_clients)]
-            self.client_data_sizes = []  # 重置每轮的样本量记录
+            self.client_data_sizes = [] 
 
-            # 训练客户端模型
+           
             logger.info(f"Aggregation strategy: {self.aggregation_strategy}")
 
-            # 所有客户端在retain data上训练
+
             for client_idx in range(self.num_clients):
                 if client_idx not in self.federated_dataset:
                     logger.warning(f"Skipping client {client_idx} as no data is available")
-                    self.client_data_sizes.append(0)  # 记录样本量为0
+                    self.client_data_sizes.append(0)
                     continue
                     
                 client_model = self.client_models[client_idx]
                 client_dataset = self.federated_dataset[client_idx]
                 
-                # 记录客户端样本量 - 使用retain数据的大小
                 retain_data = client_dataset.retain.retain
                 client_data_size = len(retain_data)
                 self.client_data_sizes.append(client_data_size)
                 
-                logger.info(f"Training client {client_idx} on retain data")
+                logger.info(f"Training client {client_idx} on retain data with {self.args.num_train_epochs} epochs")
                 self.train_client_model(client_model, client_dataset)
                 
-                # 训练完成后将模型移回CPU
                 self.client_models[client_idx] = client_model.cpu()
 
-            # 步骤4: 聚合所有客户端模型
             logger.info("Step 3: Aggregating all client models")
             self.aggregate_models(round_idx)
             logger.info(f"Completed global round {round_idx + 1}/{self.global_rounds}")
             
-            # 保存状态
             if self.args.save_strategy == "epoch" or (round_idx == self.global_rounds - 1):
                 save_path = f"{self.args.output_dir}/round_{round_idx + 1}"
-                # 确保模型在CPU上保存
                 self.model = self.model.cpu()
                 self.save_model(save_path)
                 logger.info(f"Model saved at {save_path}")
@@ -201,7 +196,6 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 return len(self.forget_data)
 
             def __getitem__(self, idx):
-                # 对retain数据集进行循环索引
                 retain_idx = idx % self.retain_length
                 return {
                     "forget": self.forget_data[idx],
@@ -209,6 +203,13 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 }
         
         combined_dataset = CombinedDataset(forget_dataset, retain_dataset)
+
+        unlearn_args = deepcopy(self.args)
+        if self.unlearn_epochs is not None:
+            unlearn_args.num_train_epochs = self.unlearn_epochs
+            logger.info(f"Using {self.unlearn_epochs} epochs for unlearn stage")
+        else:
+            logger.info(f"Using default {unlearn_args.num_train_epochs} epochs for unlearn stage")
 
         if self.aggregation_strategy == "FedProx":
             class FedProxUnlearnTrainer(trainer_cls):
@@ -245,10 +246,10 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 train_dataset=combined_dataset,
                 tokenizer=self.tokenizer,
                 data_collator=self.data_collator,
-                args=self.args,
+                args=unlearn_args, 
                 evaluator=self.evaluator,
                 template_args=self.template_args,
-                global_model=self.model.cpu(),  # 传递CPU上的全局模型
+                global_model=self.model.cpu(),
                 mu=self.federated_args['mu'],
                 **self.kwargs
             )
@@ -258,13 +259,13 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 train_dataset=combined_dataset,
                 tokenizer=self.tokenizer,
                 data_collator=self.data_collator,
-                args=self.args,
+                args=unlearn_args, 
                 evaluator=self.evaluator,
                 template_args=self.template_args,
                 **self.kwargs
             )
         
-        # 训练器会自动将模型移到正确的设备上
+
         unlearn_trainer.train()
         
         return unlearn_trainer
@@ -310,7 +311,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
                 args=self.args,
                 evaluator=self.evaluator,
                 template_args=self.template_args,
-                global_model=self.model.cpu(),  # 传递CPU上的全局模型
+                global_model=self.model.cpu(),
                 mu=self.federated_args['mu']
             )
         else:
@@ -331,7 +332,7 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
     def aggregate_models(self, round_idx=0):
         logger.info("Aggregating client models")
         
-        # 计算基于样本量的权重
+
         total_samples = sum(self.client_data_sizes)
         if total_samples == 0:
             logger.warning("No samples available for aggregation")
@@ -342,23 +343,21 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
         logger.info(f"Client weights: {[f'{w:.4f}' for w in client_weights]}")
 
         if self.is_peft:
-            # 对于PEFT模型，只聚合可训练的参数（LoRA权重）
             client_state_dicts = []
             for model in self.client_models:
-                # 只获取PEFT适配器的状态字典
+
                 # model = model.cpu()
                 # peft_state_dict = model.get_peft_model_state_dict()
                 peft_state_dict = get_peft_model_state_dict(model.cpu())
                 client_state_dicts.append(peft_state_dict)
                 logger.debug(f"Client {model} has PEFT state dict")
         else:
-            # 对于普通模型，聚合所有参数
+
             client_state_dicts = [model.cpu().state_dict() for model in self.client_models]
 
         logger.info(f"Aggregation_strategy:{self.aggregation_strategy}")
         
         if self.is_peft:
-            # 获取当前全局模型的PEFT状态字典
             # global_peft_state_dict = self.model.cpu().get_peft_model_state_dict()
             global_peft_state_dict = get_peft_model_state_dict(self.model.cpu())
         else:
@@ -417,7 +416,6 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             )
 
         elif self.aggregation_strategy == "FedProx":
-            # FedProx的聚合与FedAvg相同，使用样本量权重
             global_state_dict = FedAvg(
                 client_state_dicts,
                 global_model_state_dict=global_peft_state_dict,
@@ -425,10 +423,8 @@ class FederatedUnlearningTrainer(FinetuneTrainer):
             )
             
         if self.is_peft:
-            # 对于PEFT模型，只加载PEFT适配器的权重
             set_peft_model_state_dict(self.model, global_state_dict)
         else:
-            # 对于普通模型，加载所有权重
             self.model.load_state_dict(global_state_dict)
 
         logger.info("Global model updated")

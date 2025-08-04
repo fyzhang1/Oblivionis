@@ -2,7 +2,7 @@
 
 defaults:
   - override /model: Llama-3.2-1B-Instruct-lora
-  - override /trainer: GradAscent
+  - override /trainer: SimNPO
   - override /data: unlearn
   - override /data/datasets@data.forget: TOFU_QA_forget
   - override /data/datasets@data.retain: TOFU_QA_retain

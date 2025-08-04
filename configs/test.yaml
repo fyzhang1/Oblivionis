@@ -46,7 +46,7 @@ federated:
   num_clients: 5  # Number of Clients
   target_client_idx: 0  # Target Client Index
   client_epochs: 2  # Number of Training Epochs per Client
-  aggregation_strategy: "FedAvg"  # Aggregation Strategy: FedAvg, Weighted
+  aggregation_strategy: "FedYogi"  # Aggregation Strategy: FedAvg, Weighted
 
 # Privacy and Security Configuration
 privacy:

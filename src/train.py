@@ -15,7 +15,6 @@ def main(cfg: DictConfig):
     Args:
         cfg (DictConfig): Config to train
     """
-    # 只打印训练相关的参数
     logger.info(f"-----Training Configuration-----")
     if hasattr(cfg.trainer, 'args'):
         trainer_args = cfg.trainer.args

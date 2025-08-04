@@ -67,47 +67,32 @@ def main(cfg: DictConfig):
                 data, num_clients=num_clients, target_client_idx=target_client_idx
             )
 
-        # else:  # mode == "train" for federated fine-tuning
-        #     if "train" not in data:
-        #         raise ValueError("Training data must be in data dictionary")
-        #     # 为联邦微调准备数据
-        #     train_data = data["train"]
-        #     federated_data = {}
-        #     # 简单地将训练数据平均分配给各个客户端
-        #     dataset_size = len(train_data)
-        #     print(dataset_size)
-        #     client_size = dataset_size // num_clients
-        #     for i in range(num_clients):
-        #         start_idx = i * client_size
-        #         end_idx = start_idx + client_size if i < num_clients - 1 else dataset_size
-        #         federated_data[i] = train_data[start_idx:end_idx]
-
         else:  # mode == "train" for federated fine-tuning
             if "train" not in data:
                 raise ValueError("Training data must be in data dictionary")
             
-            # 使用numpy高效处理索引
+          
             train_data = data["train"]
             dataset_size = len(train_data)
             
-            # 计算每个客户端的基础大小和额外数据
+       
             base_size = dataset_size // num_clients
             extras = dataset_size % num_clients
             
-            # 使用numpy创建并打乱索引
+      
             indices = np.arange(dataset_size)
             rng = np.random.RandomState(cfg.trainer.args.seed)
             rng.shuffle(indices)
             
-            # 使用Subset快速分配数据，避免数据复制
+      
             federated_data = {}
             start_idx = 0
             for i in range(num_clients):
-                # 计算当前客户端的数据大小（处理不能整除的情况）
+      
                 client_size = base_size + (1 if i < extras else 0)
                 end_idx = start_idx + client_size
                 
-                # 使用Subset而不是切片，避免数据复制
+ 
                 federated_data[i] = Subset(train_data, indices[start_idx:end_idx])
                 start_idx = end_idx
         
