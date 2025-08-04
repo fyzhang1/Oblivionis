@@ -36,7 +36,7 @@ def main(cfg: DictConfig):
         logger.info(f"LR Scheduler Type: {getattr(trainer_args, 'lr_scheduler_type', 'N/A')}")
     logger.info(f"------------------------------")
 
-    # 添加调试信息
+    # Debugging information
     logger.info(f"Model Configuration: {model_cfg}")
     logger.info(f"Model Args: {model_cfg.model_args}")
     logger.info(f"Use LoRA: {model_cfg.model_args.get('use_lora', 'NOT_FOUND')}")
@@ -44,7 +44,7 @@ def main(cfg: DictConfig):
     
     model, tokenizer = get_model(model_cfg)
 
-    # PEFT信息
+    # PEFT information
     if hasattr(model, "peft_config"):
         adapter_names = list(model.peft_config.keys())
         logger.info(f"Loaded adapters: {adapter_names}")

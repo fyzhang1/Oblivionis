@@ -2,17 +2,17 @@
 set -ex
 
 # ========================================
-#           参数配置
+#     Parameters Configuration
 # ========================================
-forget_split_list=("forget05" "forget10")
-retain_split_list=("retain95" "retain90")
-holdout_split_list=("holdout05" "holdout10")
+forget_split_list=("forget01" "forget05" "forget10")
+retain_split_list=("retain99" "retain95" "retain90")
+holdout_split_list=("holdout01" "holdout05" "holdout10")
 
-FL_Method="FedAdam"
+FL_Method="FedAvg"
 Model_Size="1B"
 
 # ========================================
-#           日志/保存目录准备
+#     Log/Save Directory Preparation
 # ========================================
 mkdir -p logs/retain/eval
 mkdir -p logs/finetune/eval
@@ -24,14 +24,14 @@ mkdir -p saves/unlearn
 mkdir -p saves/eval
 
 # ========================================
-#           运行前提示
+#     Warning
 # ========================================
 num_splits=${#forget_split_list[@]}
-read -p "即将运行所有实验组合，是否继续？[Y/n] " confirm
+read -p "Ready to run the whole experiments? [Y/n] " confirm
 [[ $confirm == [Nn]* ]] && exit 1
 
 # ========================================
-#           Retain 阶段
+#     Retain
 # ========================================
 declare -a retain_task_names
 
@@ -48,13 +48,13 @@ for ((i=0; i<$num_splits; i++)); do
   python src/federated_train.py \
     --config-name=train-lora.yaml \
     experiment=finetune/tofu/default.yaml \
-    task_name=${retain_task_name}\
+    task_name=${retain_task_name} \
     data/datasets@data.train=TOFU_QA_retain \
     data.train.TOFU_QA_retain.args.hf_args.name=${retain_split} \
     paths.output_dir=saves/retain/${retain_task_name} \
     2>&1 | tee logs/retain/${retain_task_name}.txt
 
-  echo "[Step 1 ✅] Retain Train 完成：${retain_split}"
+  echo "[Step 1 ✅] Retain Train Finish：${retain_split}"
 
   python src/eval.py \
     experiment=eval/tofu/default.yaml \
@@ -66,11 +66,11 @@ for ((i=0; i<$num_splits; i++)); do
     hydra.run.dir=saves/eval/${retain_task_name} \
     2>&1 | tee logs/retain/eval/${retain_task_name}.txt
 
-  echo "[Step 2 ✅] Retain Eval 完成：${retain_split}"
+  echo "[Step 2 ✅] Retain Eval Finish：${retain_split}"
 done
 
 # ========================================
-#           Finetune 阶段
+#     Finetune
 # ========================================
 finetune_task_name="${Model_Size}_${FL_Method}_Finetune"
 
@@ -83,11 +83,8 @@ python src/federated_train.py \
   paths.output_dir=saves/finetune/${finetune_task_name} \
   2>&1 | tee logs/finetune/${finetune_task_name}.txt
 
-echo "[Step 3 ✅] Finetune 完成"
+echo "[Step 3 ✅] Finetune Finish"
 
-# ========================================
-#           Finetune 评估阶段
-# ========================================
 for ((i=0; i<$num_splits; i++)); do
   forget_split=${forget_split_list[$i]}
   retain_task_name=${retain_task_names[$i]}
@@ -106,11 +103,11 @@ for ((i=0; i<$num_splits; i++)); do
     hydra.run.dir=saves/eval/${finetune_task_name}/${forget_split} \
     2>&1 | tee logs/finetune/eval/${finetune_task_name}_${forget_split}.txt
 
-  echo "[Step 4 ✅] Finetune Eval 完成：forget=${forget_split}"
+  echo "[Step 4 ✅] Finetune Eval Finish：forget=${forget_split}"
 done
 
 # ========================================
-#           Unlearning 阶段
+#     Unlearning
 # ========================================
 unlearn_cls=("GradAscent" "GradDiff" "NPO" "SimNPO")
 
@@ -119,12 +116,12 @@ trainer_yaml="configs/trainer/FederatedUnlearningTrainer.yaml"
 
 for AfterUnlearn in "${unlearn_cls[@]}"; do
   echo -e "\n==============================="
-  echo ">>> 当前 Unlearn 方法: $AfterUnlearn"
+  echo ">>> Present Unlearn Method: $AfterUnlearn"
   echo "==============================="
 
   trainer_line=$(grep '\- override /trainer:' "$default_yaml")
   if [[ -z "$trainer_line" ]]; then
-    echo "❌ 错误：未找到 override /trainer 行"
+    echo "❌ Error: Unable to find override /trainer line"
     exit 1
   fi
   BeforeUnlearn=$(echo "$trainer_line" | awk -F": " '{print $2}' | xargs)
@@ -132,7 +129,7 @@ for AfterUnlearn in "${unlearn_cls[@]}"; do
   current_cls=$(grep "^[[:space:]]*unlearn_trainer_cls:" "$trainer_yaml" | awk -F'"' '{print $2}' | xargs)
 
   if [[ "$BeforeUnlearn" == "$current_cls" ]]; then
-    echo "[ACTION] 替换 Trainer：$BeforeUnlearn → $AfterUnlearn"
+    echo "[ACTION] Replace Trainer：$BeforeUnlearn → $AfterUnlearn"
 
     sed -i "s|^\([[:space:]]*- override /trainer:\).*|\1 $AfterUnlearn|" "$default_yaml"
     sed -i "s|^\([[:space:]]*unlearn_trainer_cls:\).*|\1 \"$AfterUnlearn\"|" "$trainer_yaml"
@@ -157,11 +154,10 @@ for AfterUnlearn in "${unlearn_cls[@]}"; do
         task_name=${unlearn_task_name} \
         model.model_args.pretrained_model_name_or_path=saves/finetune/${finetune_task_name} \
         retain_logs_path=saves/eval/${retain_task_name}/TOFU_EVAL.json \
-        paths.output_dir=saves/unlearn/${unlearn_task_name}\
+        paths.output_dir=saves/unlearn/${unlearn_task_name} \
         2>&1 | tee logs/unlearn/${unlearn_task_name}.txt
 
-
-      echo "[Step 5 ✅] Unlearn Train 完成：$unlearn_task_name"
+      echo "[Step 5 ✅] Unlearn Train Finish：$unlearn_task_name"
 
       # Step 6: Unlearn Eval
       python src/eval.py \
@@ -175,11 +171,11 @@ for AfterUnlearn in "${unlearn_cls[@]}"; do
         paths.output_dir=saves/eval/${unlearn_task_name} \
         2>&1 | tee logs/unlearn/eval/${unlearn_task_name}.txt
 
-      echo "[Step 6 ✅] Unlearn Eval 完成：$unlearn_task_name"
+      echo "[Step 6 ✅] Unlearn Eval Finish：$unlearn_task_name"
     done
   else
-    echo "⚠️ 配置不一致（$BeforeUnlearn ≠ $current_cls），跳过 $AfterUnlearn"
+    echo "⚠️ Config Mismatch（$BeforeUnlearn ≠ $current_cls），Skip $AfterUnlearn"
   fi
 done
 
-echo -e "\n✅ 所有实验全部完成 ✅"
+echo -e "\n✅ All experiments completed! ✅"

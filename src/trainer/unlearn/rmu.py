@@ -28,7 +28,7 @@ class RMU(GradDiff):
         if self.ref_model is None:
             print("Creating reference model...")
             self.ref_model = self._prepare_ref_model(self.model)
-            # 将参考模型移到CPU以节省GPU内存
+            # Move reference model to CPU to save GPU memory
             print("Moving reference model to CPU to save GPU memory...")
             self.ref_model = self.ref_model.cpu()
 
@@ -58,15 +58,15 @@ class RMU(GradDiff):
         # Check if the model is a LoRA model
         is_lora_model = isinstance(model, PeftModel) or any(".lora_" in name for name, _ in model.named_modules())
         print(f"Model is {'a LoRA model' if is_lora_model else 'not a LoRA model'}")
-        
-        # 使用 re.search 查找匹配的模块
+
+        # Use re.search to find matching modules
         for name, module in model.named_modules():
             name = name.replace(".default", "")
             if re.search(module_regex, name):
                 print(f"Found matching module: {name}")
                 return module
-        
-        # 如果没有匹配，抛出详细错误信息
+
+        # If no match is found, raise a detailed error
         raise ValueError(f"No module matched with {module_regex}. Available modules printed above.")
 
     # def _get_matching_module(self, model, module_regex):
@@ -147,19 +147,19 @@ class RMU(GradDiff):
             model_retain_activations, _ = self.forward_with_cache(
                 model, retain_inputs, module=self.model_module, no_grad=False
             )
-            
-            # 临时将参考模型移到GPU进行计算
+
+            # Temporarily move the reference model to GPU for computation
             device = model_retain_activations.device
             self.ref_model = self.ref_model.to(device)
             
             ref_retain_activations, _ = self.forward_with_cache(
                 self.ref_model, retain_inputs, module=self.ref_module, no_grad=True
             )
-            
-            # 立即将参考模型移回CPU
+
+            # Immediately move the reference model back to CPU
             self.ref_model = self.ref_model.cpu()
-            torch.cuda.empty_cache()  # 清理GPU缓存
-            
+            torch.cuda.empty_cache()  # Clear GPU cache
+
             mask = retain_inputs["labels"] != -100  # Shape: [b, s]
             retain_loss = self.compute_activation_loss(
                 model_retain_activations,

@@ -27,7 +27,7 @@ class GradAscent(UnlearnTrainer):
         forget_inputs = {
             "input_ids": forget["input_ids"],
             "attention_mask": forget["attention_mask"],
-            "labels": forget.get("labels", None),  # labels 可能为 None
+            "labels": forget.get("labels", None),  # labels could be None if not provided
         }
         
         # Call model to compute outputs

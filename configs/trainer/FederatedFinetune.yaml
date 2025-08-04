@@ -2,21 +2,21 @@ handler: FederatedFinetuneTrainer
 method_args:
   num_clients: 3  # Total number of clients in federated learning
   aggregation_strategy: "FedAdam"  # FedAvg, FedAdam, FedYogi, FedAdagrad, FedAvgM
-  global_rounds: 2  # 全局训练轮数设置
+  global_rounds: 2  # Total number of global training rounds
 
 args:
   output_dir: saves/finetune/${task_name}
   logging_dir: ${trainer.args.output_dir}/logs
-  per_device_train_batch_size: 32  # 减少批次大小，降低内存占用
-  per_device_eval_batch_size: 1   # 减少评估批次大小
-  gradient_accumulation_steps: 1  # 增加梯度累积步数，保持有效批次大小
+  per_device_train_batch_size: 32  # Reduce batch size to lower memory usage
+  per_device_eval_batch_size: 1   # Reduce evaluation batch size
+  gradient_accumulation_steps: 1  # Increase gradient accumulation steps to maintain effective batch size
   learning_rate: 8e-5
   bf16: True
   bf16_full_eval: True
   logging_steps: 5
   report_to: tensorboard
   ddp_find_unused_parameters: None
-  gradient_checkpointing: False  # 禁用梯度检查点，解决LoRA兼容性问题
+  gradient_checkpointing: False  # Disable gradient checkpointing to address LoRA compatibility issues
   optim: paged_adamw_32bit
   save_strategy: 'no'
   save_only_model: True
