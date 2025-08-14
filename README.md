@@ -35,7 +35,7 @@
 
 ---
 
-> **「我、忘却を恐れるなかれ」 —— 豊川祥子**
+> **「我、忘却を恐れるなかれ」 — 豊川祥子**
 
 
 This repo is the official implementation of **Oblivionis** proposed by our paper ["Oblivionis: A Lightweight Learning and Unlearning Framework for Federated Large Language Models"](https://arxiv.org/abs/2508.08875).
@@ -203,6 +203,9 @@ Looking ahead, we plan to gradually include the following components:
 - This paper is inspired by [OpenFedLLM](https://github.com/rui-ye/OpenFedLLM) and [OpenUnlearning](https://github.com/locuslab/open-unlearning), and also developed based on OpenUnlearning.
 - Our implementation is built upon the [TOFU](https://github.com/locuslab/tofu) and [MUSE](https://github.com/swj0419/muse_bench) benchmarks.
 - Our framework and paper take their name from [Lacus Oblivionis](https://en.wikipedia.org/wiki/Lacus_Oblivionis), a small lunar mare. Though, **to be honest**, it’s from [Ave Mujica](https://anime.bang-dream.com/avemujica/), a Japanese band that is part of [Bushiroad](https://bushiroad.com/)'s [BanG Dream!](https://en.bang-dream.com/) media franchise.
+- To every **MyGO!!!!! (迷途之子!!!!!)**,
+
+> **「僕は僕の味方でいようよ、まだまだ長い道の途中」（『栞』より）**
 
 ## 🔖 License
 
