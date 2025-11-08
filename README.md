@@ -25,7 +25,7 @@
 
 <p align="center">
   <sup>1 </sup>Nanyang Technological University
-  <sup>2 </sup>Hebei Normal University
+  <sup>2 </sup>Hebei Normal University,<br>
   <sup>3 </sup>Institute of Science Tokyo
   <sup>4 </sup>Alibaba Group
   <sup>5 </sup>Hong Kong Polytechnic University
