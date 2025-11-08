@@ -15,21 +15,20 @@
   <a href="https://github.com/Tristan-SHU">Xinyu Yan</a><sup>1,*</sup>, 
   <a href="https://scholar.google.com/citations?user=7YsN6lMAAAAJ">Tiantong Wu</a><sup>1</sup>, 
   <a href="https://imamtom.github.io/">Wenjie Li</a><sup>1,2</sup>, 
-  Tianxiang Chen</a><sup>1,3</sup>,<br>
-  <a href="https://yangcao888.github.io/">Yang Cao</a><sup>4</sup>, 
+  Tianxiang Chen</a><sup>1</sup>,<br>
+  <a href="https://yangcao888.github.io/">Yang Cao</a><sup>3</sup>, 
   <a href="https://ranyan.w3spaces.com/">Ran Yan</a><sup>1</sup>, 
-  <a href="https://scholar.google.com/citations?user=EQDfV9cAAAAJ">Longtao Huang</a><sup>5</sup>, 
+  <a href="https://scholar.google.com/citations?user=EQDfV9cAAAAJ">Longtao Huang</a><sup>4</sup>, 
   <a href="https://sites.google.com/view/wyb">Wei Yang Bryan Lim</a><sup>1,†</sup>, 
-  <a href="https://www.polyu.edu.hk/dsai/docdrive/personal/yangqiang.html">Qiang Yang</a><sup>6</sup>
+  <a href="https://www.polyu.edu.hk/dsai/docdrive/personal/yangqiang.html">Qiang Yang</a><sup>5</sup>
 </p>
 
 <p align="center">
   <sup>1 </sup>Nanyang Technological University
   <sup>2 </sup>Hebei Normal University
-  <sup>3 </sup>Beihang University<br>
-  <sup>4 </sup>Institute of Science Tokyo
-  <sup>5 </sup>Alibaba Group
-  <sup>6 </sup>Hong Kong Polytechnic University
+  <sup>3 </sup>Institute of Science Tokyo
+  <sup>4 </sup>Alibaba Group
+  <sup>5 </sup>Hong Kong Polytechnic University
 </p>
 
 
