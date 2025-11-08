@@ -42,7 +42,7 @@ This repo is the official implementation of **Oblivionis** proposed by our paper
 
 ## 📃 Changelog
 
-- **[2025-11-08] **🔥 Oblivionis has been accepted by AAAI 2026.
+- **[2025-11-08]**🔥 Oblivionis has been accepted by AAAI 2026.
 - **[2025-08-13]** The preprint version of our paper was published on [arXiv](https://arxiv.org/abs/2508.08875).
 - **[2025-08-04]** We released the first version of **Oblivionis** on GitHub.
 
