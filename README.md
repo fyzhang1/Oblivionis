@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="./assets/icon.svg" alt="logo" width="42" />Oblivionis: A Lightweight Learning and Unlearning Framework for Federated Large Language Models
+  <img src="./assets/icon.svg" alt="logo" width="42" />Oblivionis: A Lightweight Learning and Unlearning Framework for Federated Large Language Models (AAAI 2026)
 </h1>
 <p align="center">
   <a href="https://arxiv.org/abs/2508.08875">
