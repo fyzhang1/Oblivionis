@@ -35,12 +35,16 @@
 
 ---
 
-> **「我、忘却を恐れるなかれ」 — 豊川祥子**
-
 
 This repo is the official implementation of **Oblivionis** proposed by our paper ["Oblivionis: A Lightweight Learning and Unlearning Framework for Federated Large Language Models"](https://arxiv.org/abs/2508.08875).
 
 **Oblivionis** is a Python framework for the reproduction and development of the learning and unlearning of Federated Large Language Models research. It integrates 6 representative federated learning algorithms, 5 machine unlearning methods, 2 federated fine-tuning methods (full-parameter and LoRA-based), and a variety of models. **Oblivionis** also supports 5 datasets and over 10 evaluation metrics.
+
+## 📃 Changelog
+
+- **[2025-11-08] **🔥 Oblivionis has been accepted by AAAI 2026.
+- **[2025-08-13]** The preprint version of our paper was published on [arXiv](https://arxiv.org/abs/2508.08875).
+- **[2025-08-04]** We released the first version of **Oblivionis** on GitHub.
 
 ---
 
@@ -72,11 +76,6 @@ To address this gap, we introduce **Oblivionis**, a lightweight learning and unl
 <p align="center">Figure 1. Overview of the proposed <b>Oblivionis</b> framework.
 </p>
 
-
-## 📃 Changelog
-
-- **[2025-08-13]** The preprint version of our paper was published on [arXiv](https://arxiv.org/abs/2508.08875).
-- **[2025-08-04]** We released the first version of **Oblivionis** on GitHub.
 
 ## ⚡ Quick Start
 
@@ -202,10 +201,6 @@ Looking ahead, we plan to gradually include the following components:
 
 - This paper is inspired by [OpenFedLLM](https://github.com/rui-ye/OpenFedLLM) and [OpenUnlearning](https://github.com/locuslab/open-unlearning), and also developed based on OpenUnlearning.
 - Our implementation is built upon the [TOFU](https://github.com/locuslab/tofu) and [MUSE](https://github.com/swj0419/muse_bench) benchmarks.
-- Our framework and paper take their name from [Lacus Oblivionis](https://en.wikipedia.org/wiki/Lacus_Oblivionis), a small lunar mare. Though, **to be honest**, it’s from [Ave Mujica](https://anime.bang-dream.com/avemujica/), a Japanese band that is part of [Bushiroad](https://bushiroad.com/)'s [BanG Dream!](https://en.bang-dream.com/) media franchise.
-- To every **MyGO!!!!! (迷途之子!!!!!)**,
-
-> **「僕は僕の味方でいようよ、まだまだ長い道の途中」（『栞』より）**
 
 ## 🔖 License
 
